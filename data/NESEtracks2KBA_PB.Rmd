@@ -1,0 +1,270 @@
+---
+title: "NESEtracks2KBA_PB"
+author: "Luis Huckstadt"
+date: "2024-08-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load libraries and files with the cluster classification
+
+```{r}
+library(track2KBA) # load package
+library(dplyr)
+#library(tictoc)
+library(readr)
+library(sf)
+library(ggplot2)
+library(tidyverse)
+library(raster)
+library(data.table)
+
+#Function to change longitude
+transform_longitude_vector <- function(lons) {
+  sapply(lons, function(lon) ifelse(lon < 0, lon + 360, lon))
+}
+
+```
+Run KBA for all PB females identified without considering the seasons
+
+```{r}
+PBFemales <- read_csv("../results/PB_Clusters.csv")
+col2keep <- c('TOPPID','clusterAll')
+PBFemales <- PBFemales[,col2keep]
+
+# Load the tracking data
+data <- read.csv("../data/NESETracks6h.csv")
+data$longitude <- transform_longitude_vector(data$longitude) # Shift to 0 - 360
+range(data$longitude)
+#data$longitude <- data$longitude - 256 # ShiftLong  to avoid issues with the IDL
+c2 <- c("FieldID","track_id","JulDate","longitude","latitude","Season","date_gmt", "time_gmt" )
+data <- data[,c2]
+colnames(data) <- c("FieldID","TOPPID","JulDate","longitude","latitude","Season","date_gmt", "time_gmt" )
+
+# Match the clusters to the tracks
+data <- data %>% semi_join(PBFemales, by = 'TOPPID')
+  
+
+```
+
+First step of the analysis
+```{r}
+### FIRST STEP, RUN THE ANALYSIS FOR THE WHOLE POPULATION
+# Prepare the data for analysis
+NESE.data <- formatFields(
+  dataGroup = data, 
+  fieldID   = "TOPPID", 
+  fieldDate = "date_gmt", 
+  fieldTime = "time_gmt",
+  fieldLon  = "longitude", 
+  fieldLat  = "latitude"
+)
+
+
+# Identify Año Nuevo as a colony
+colony <- NESE.data %>% 
+  summarise(
+    Longitude = first(Longitude), 
+    Latitude  = first(Latitude)
+  )
+
+# Identify the individual trips
+NESE.trips <- tripSplit(
+  dataGroup  = NESE.data,
+  colony     = colony,
+  innerBuff  = 100,      # kilometers
+  returnBuff = 100,
+  duration   = 100,      # hours
+  rmNonTrip  = TRUE
+)
+
+# Creates the maps with the trips
+pdf("../maps/NESEt2kba_Trips_PB.pdf")
+mapTrips(trips = NESE.trips, colony = colony)
+dev.off()
+
+mapTrips(trips = NESE.trips, colony = colony)
+
+# Trips summaries
+NESE.sumTrips <- tripSummary(trips = NESE.trips, colony = colony)
+NESE.sumTrips
+
+
+```
+
+Kernel analysis
+
+```{r}
+#NESE.trips$Longitude <- transform_longitude_vector(NESE.trips$Longitude)
+NESE.tracks <- projectTracks(dataGroup = NESE.trips, projType = 'azim', custom=TRUE )
+
+# Estimate the scale, h value
+NESE.hVals <- findScale(
+  tracks   = NESE.tracks,
+  scaleARS = TRUE,
+  sumTrips = NESE.sumTrips)
+
+NESE.hVals
+
+# Remove locations within 100 km of the colony
+NESE.tracks <- NESE.tracks[NESE.tracks$ColDist > 100, ] # remove trip start and end points near colony
+
+ # Kernel Density Estimates
+NESE.KDE <- estSpaceUse(
+  tracks = NESE.tracks, 
+  scale = NESE.hVals$href, 
+  levelUD = 50, 
+  polyOut = TRUE 
+  )
+
+kde.fig <- mapKDE(KDE = NESE.KDE$UDPolygons, colony = colony)
+print(kde.fig)
+ggsave(filename = "../figures/kdeUB_PB.pdf",
+       plot = kde.fig,
+       device = cairo_pdf)
+
+
+# Save the individuals UDs
+st_write(NESE.KDE$UDPolygons, "../results/NESEUD50_PB_href.shp",append=FALSE)
+```
+UD analysis
+```{r}
+
+
+#tic()
+NESE.repr <- repAssess(
+  tracks    = NESE.tracks, 
+  KDE       = NESE.KDE$KDE.Surface, 
+  levelUD   = 50,
+  iteration = 500)
+#toc()
+
+NESE.Site.1 <- findSite(
+  KDE = NESE.KDE$KDE.Surface,
+  represent = NESE.repr$out,
+  levelUD = 50,
+  popSize = 1800,     # 1800 individual adult females elephant seals at Año Nuevo
+  polyOut =  TRUE
+)
+
+NESE.Site.2 <- findSite(
+  KDE = NESE.KDE$KDE.Surface,
+  represent = NESE.repr$out,
+  levelUD = 50,
+  popSize = 1800     # 1800 individual adult females elephant seals at Año Nuevo
+  )
+
+
+#Sitemap <- mapSite(NESE.Site.1, colony = colony)
+
+# Potential Site
+
+#potSite <- NESE.Site.1 %>% dplyr::filter(.data$potentialSite==TRUE) %>% 
+#  summarise(
+#    max_animals = max(na.omit(N_animals)), # maximum number of animals aggregating in the site
+#    min_animals = min(na.omit(N_animals))  # minimum number using the site
+#  )
+
+
+mapSite(NESE.Site.2, colony = colony)
+
+t2kba.1 <- raster(NESE.Site.2, layer = 1, values = TRUE)
+t2kba.1[t2kba.1 == 0] <- NA
+
+t2kba.2 <- raster(NESE.Site.2, layer = 2, values = TRUE)
+t2kba.2[t2kba.2 == 0] <- NA
+
+#Save the data frame
+saveRDS(NESE.Site.2,'../results/NESEt2kba_PB.rds')
+writeRaster(t2kba.1,'../results/t2kba1_PB.tif',overwrite=TRUE)
+writeRaster(t2kba.2,'../results/t2kba2_PB.tif',overwrite=TRUE)
+
+
+
+```
+
+
+Create the maps
+```{r}
+library(stars)
+library(sf)
+library(ggplot2)
+
+
+#Load the raster created originally
+t2kba.i <- read_stars('../results/t2kba1_PB.tif')
+t2kba.i[t2kba.i==0] <- NA
+
+# Read the coastline
+coastline <- st_read('../data/GSHHS_shp/f/GSHHS_f_L1.shp')
+
+#read map as a shapefile
+coastline.p <- st_transform(coastline, st_crs(t2kba.i))
+rstr.ext <- st_coordinates(t2kba.i)
+
+map_limits <- c(-5702014.0,7534.8,-585362.4,3869809.3) # Set map limits for all figures
+
+# read the 200m isobath
+iso200 <- st_read('../data/Shelf/ETOPO2024_200m_NP.shp')
+iso200.p <- st_transform(iso200, st_crs(t2kba.i))
+
+
+# Turn colony coordinates into a sf
+colony.p <- st_as_sf(colony, coords = c("Longitude", "Latitude"), crs = 4326)
+colony.p <- st_transform(colony.p, st_crs(t2kba.i))
+
+# Generate graticules
+graticules <- st_graticule(lon = seq(-180,180, 10),
+                           lat = seq(-90,90, 10)) 
+graticules.p <- st_transform(graticules, st_crs(t2kba.i))
+
+# Generate tick labels
+ticks <- as.data.frame(cbind(graticules.p$x_start,graticules.p$y_start))
+colnames(ticks) <- c("lon", "lat")
+ticks <-  st_as_sf(ticks, coords = c("lon", "lat"), crs = 4326)
+ticks.p <- st_transform(ticks, st_crs(t2kba.i))
+ticks <- as.data.frame(st_coordinates(ticks.p))
+
+
+x_ticks <- ticks$X[1:37]
+x_labels <- c("180°","170°W","160°W","150°W","140°W","130°W","120°W","110°W","100°W",
+              "90°W","80°W","70°W","60°W","50°W","40°W","30°W","20°W","10°W","0°",
+              "10°E","20°E","30°E","40°E","50°E","60°E","70°E","80°E","90°E","100°E",
+              "110°E","120°E","130°E","140°E","150°E","160°E","170°E","180°")
+
+y_ticks <- ticks$Y[38:54]
+y_labels <- c("80°S","70°S","60°S","50°S","40°S","30°S","20°S","10°S","0°",
+              "10°N","20°N","30°N","40°N","50°N","60°N","70°N","80°N")
+
+
+# Create map 
+nese_plot <- ggplot() +
+  geom_stars(data = t2kba.i) + 
+  scale_fill_viridis_c(name ='No. Ind', na.value="transparent") +
+  geom_sf(data = coastline.p, fill = 'grey55' ) + 
+  geom_sf(data = iso200.p, color = "grey85", size = 0.4) + 
+  geom_sf(data = colony.p, aes(geometry = geometry), 
+          shape = 23, color = "black", fill = "darkorange3", size = 5) +
+  lims(x = c(map_limits[1], map_limits[2]), y = c(map_limits[3], map_limits[4])) + 
+  labs(x = 'Longitude (°)', y = 'Latitude (°)') +
+  theme(panel.background = element_rect(fill = "skyblue3",
+                                colour = "skyblue3"),
+        panel.grid.major = element_blank()) +
+         annotation_scale(location = "bl", width_hint = 0.3) +
+  
+  geom_sf(data = graticules.p, colour = "grey95", alpha = 0.7, linewidth = 0.3, linetype = "dashed")
+  
+print(nese_plot)
+
+ggsave(filename = "../figures/KBA_PBFemales.pdf",
+       plot = nese_plot,
+       device = cairo_pdf)
+
+
+
+
+
+```

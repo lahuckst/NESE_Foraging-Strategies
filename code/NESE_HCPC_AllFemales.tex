@@ -1,0 +1,736 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={NESE\_HCPC AllFemales},
+  pdfauthor={Luis Huckstadt},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{NESE\_HCPC AllFemales}
+\author{Luis Huckstadt}
+\date{2024-07-16}
+
+\begin{document}
+\maketitle
+
+Load all libraries
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(gclus)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: package 'gclus' was built under R version 4.4.1
+\end{verbatim}
+
+\begin{verbatim}
+## Loading required package: cluster
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(SIBER)}
+\FunctionTok{library}\NormalTok{(ggplot2)}
+\FunctionTok{library}\NormalTok{(plyr)}
+\FunctionTok{library}\NormalTok{(dplyr)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Attaching package: 'dplyr'
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:plyr':
+## 
+##     arrange, count, desc, failwith, id, mutate, rename, summarise,
+##     summarize
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:stats':
+## 
+##     filter, lag
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(factoextra)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Welcome! Want to learn more? See two factoextra-related books at https://goo.gl/ve3WBa
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(ggfortify)}
+\FunctionTok{library}\NormalTok{(pls)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Attaching package: 'pls'
+\end{verbatim}
+
+\begin{verbatim}
+## The following object is masked from 'package:stats':
+## 
+##     loadings
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(FactoMineR)}
+\FunctionTok{library}\NormalTok{(tibble)}
+\FunctionTok{library}\NormalTok{(nicheROVER)}
+\FunctionTok{library}\NormalTok{(mclust)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Package 'mclust' version 6.1.1
+## Type 'citation("mclust")' for citing this R package in publications.
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(qwraps2)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Attaching package: 'qwraps2'
+\end{verbatim}
+
+\begin{verbatim}
+## The following object is masked from 'package:ggplot2':
+## 
+##     mean_se
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(ggstatsplot)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## You can cite this package as:
+##      Patil, I. (2021). Visualizations with statistical details: The 'ggstatsplot' approach.
+##      Journal of Open Source Software, 6(61), 3167, doi:10.21105/joss.03167
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(dispRity)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Loading required package: ape
+\end{verbatim}
+
+\begin{verbatim}
+## 
+## Attaching package: 'ape'
+\end{verbatim}
+
+\begin{verbatim}
+## The following object is masked from 'package:pls':
+## 
+##     mvr
+\end{verbatim}
+
+\begin{verbatim}
+## The following object is masked from 'package:dplyr':
+## 
+##     where
+\end{verbatim}
+
+\begin{verbatim}
+## Registered S3 method overwritten by 'vegan':
+##   method         from 
+##   reorder.hclust gclus
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(NbClust)}
+
+\DocumentationTok{\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#}
+\DocumentationTok{\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#}
+\DocumentationTok{\#\#\#    DEFINE SUMMARY     }\AlertTok{\#\#\#}
+\DocumentationTok{\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#}
+\DocumentationTok{\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#\#}
+
+\CommentTok{\# Text to create summary talble for variables}
+\NormalTok{our\_summary1 }\OtherTok{\textless{}{-}}
+  \FunctionTok{list}\NormalTok{(}\StringTok{"d13C"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(d13C)),}
+       \StringTok{"d15N"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(d15N)),}
+       \StringTok{"MaxLat\_degrees"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(MaxLat\_degrees)),}
+       \StringTok{"MinLon\_degrees"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(MinLon\_degrees)),}
+       \StringTok{"MedianDistToContShelf\_km"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(MedianDistToContShelf\_km)),}
+       \StringTok{"SdDistContShelf\_km"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(SdDistContShelf\_km)),}
+       \StringTok{"MesoEcoProportionShelf"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(MesoEcoProportionShelf)),}
+       \StringTok{"MesoEcoProportionCAC"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(MesoEcoProportionCAC)),}
+       \StringTok{"MesoEcoProportionSubArcticPac"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(MesoEcoProportionSubArcticPac)),}
+       \StringTok{"MesoEcoProportionNorthCPac"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(MesoEcoProportionNorthCPac)),}
+       \StringTok{"Mean\_Depth\_m"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(Mean\_Depth\_m)),}
+       \StringTok{"Mean\_Depth\_sd"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(Mean\_Depth\_sd)),}
+       \StringTok{"Mean\_Duration\_sec"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(Mean\_Duration\_sec)),}
+       \StringTok{"Mean\_Duration\_sd"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(Mean\_Duration\_sd)),}
+       \StringTok{"Pct\_TransitDives"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(Pct\_TransitDives)),}
+       \StringTok{"Pct\_ForagingDives"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(Pct\_ForagingDives)),}
+       \StringTok{"Pct\_DriftDives"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(Pct\_DriftDives)),}
+       \StringTok{"Pct\_BenthicDives"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(Pct\_BenthicDives)),}
+       \StringTok{"PctTripDiving"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(PctTripDiving)),}
+       \StringTok{"DeepDayForageDivesMedian\_m"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(DeepDayForageDivesMedian\_m)),}
+       \StringTok{"DeepNightForageDivesMedian\_m"} \OtherTok{=} \FunctionTok{list}\NormalTok{(}\StringTok{"mean (sd)"} \OtherTok{=} \ErrorTok{\textasciitilde{}}\NormalTok{ qwraps2}\SpecialCharTok{::}\FunctionTok{mean\_sd}\NormalTok{(DeepNightForageDivesMedian\_m))}
+\NormalTok{  )}
+\end{Highlighting}
+\end{Shaded}
+
+HCPC analysis for all NESE females
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{data.iso }\OtherTok{\textless{}{-}} \FunctionTok{readRDS}\NormalTok{(}\StringTok{"../data/data\_iso.rds"}\NormalTok{)}
+
+\NormalTok{col4PCA }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}TOPPID\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}Trip\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}Sex\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}ProcedureYear\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}d13C\textquotesingle{}}\NormalTok{,  }\StringTok{\textquotesingle{}d15N\textquotesingle{}}\NormalTok{, }
+             \StringTok{\textquotesingle{}MaxLat\_degrees\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}MinLon\_degrees\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}MedianDistToContShelf\_km\textquotesingle{}}\NormalTok{,  }
+             \StringTok{\textquotesingle{}SdDistContShelf\_km\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}MesoEcoProportionShelf\textquotesingle{}}\NormalTok{, }
+             \StringTok{\textquotesingle{}MesoEcoProportionCAC\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}MesoEcoProportionSubArcticPac\textquotesingle{}}\NormalTok{,    }
+             \StringTok{\textquotesingle{}MesoEcoProportionNorthCPac\textquotesingle{}}\NormalTok{,}\StringTok{\textquotesingle{}Mean\_Depth\_m\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}Mean\_Depth\_sd\textquotesingle{}}\NormalTok{,}
+             \StringTok{\textquotesingle{}Mean\_Duration\_sec\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}Mean\_Duration\_sd\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}Pct\_TransitDives\textquotesingle{}}\NormalTok{, }
+             \StringTok{\textquotesingle{}Pct\_ForagingDives\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}Pct\_DriftDives\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}Pct\_BenthicDives\textquotesingle{}}\NormalTok{, }
+             \StringTok{\textquotesingle{}PctTripDiving\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}DeepDayForageDivesMedian\_m\textquotesingle{}}\NormalTok{, }
+             \StringTok{\textquotesingle{}DeepNightForageDivesMedian\_m\textquotesingle{}}\NormalTok{) }
+
+
+\NormalTok{PCAdata }\OtherTok{\textless{}{-}}\NormalTok{ data.iso[,col4PCA] }\CommentTok{\# 306 cases  }
+\NormalTok{PCAdata}\SpecialCharTok{$}\NormalTok{DeepDayForageDivesMedian\_m }\OtherTok{\textless{}{-}}\NormalTok{ PCAdata}\SpecialCharTok{$}\NormalTok{DeepDayForageDivesMedian\_m }\SpecialCharTok{*{-}}\DecValTok{1}
+\NormalTok{PCAdata}\SpecialCharTok{$}\NormalTok{DeepNightForageDivesMedian\_m }\OtherTok{\textless{}{-}}\NormalTok{ PCAdata}\SpecialCharTok{$}\NormalTok{DeepNightForageDivesMedian\_m }\SpecialCharTok{*{-}}\DecValTok{1}
+\NormalTok{PCAdata}\SpecialCharTok{$}\NormalTok{ProcedureYear }\OtherTok{\textless{}{-}} \FunctionTok{as.factor}\NormalTok{(PCAdata}\SpecialCharTok{$}\NormalTok{ProcedureYear)}
+\NormalTok{f.PCAdata }\OtherTok{\textless{}{-}}\NormalTok{ dplyr}\SpecialCharTok{::}\FunctionTok{filter}\NormalTok{(PCAdata, Sex }\SpecialCharTok{==} \StringTok{"Female"}\NormalTok{) }\CommentTok{\# Extract the data just for females , 180 females}
+
+
+\CommentTok{\#First exploratory PCA with all data, including Isotopes}
+\NormalTok{f.PCAdata}\FloatTok{.1} \OtherTok{\textless{}{-}} \FunctionTok{na.omit}\NormalTok{(f.PCAdata)}
+\FunctionTok{row.names}\NormalTok{(f.PCAdata}\FloatTok{.1}\NormalTok{) }\OtherTok{\textless{}{-}}\NormalTok{ f.PCAdata}\FloatTok{.1}\SpecialCharTok{$}\NormalTok{TOPPID}
+\CommentTok{\#f.PCAdata.1[1] \textless{}{-} NULL}
+
+\CommentTok{\# Correlation Matrix plot}
+\NormalTok{cor.data }\OtherTok{\textless{}{-}} \FunctionTok{abs}\NormalTok{(}\FunctionTok{cor}\NormalTok{(f.PCAdata}\FloatTok{.1}\NormalTok{[}\FunctionTok{c}\NormalTok{(}\DecValTok{5}\SpecialCharTok{:}\DecValTok{25}\NormalTok{)]))}
+\NormalTok{cor.colours }\OtherTok{\textless{}{-}} \FunctionTok{dmat.color}\NormalTok{(cor.data)}
+\NormalTok{cor.ordered }\OtherTok{\textless{}{-}} \FunctionTok{order.single}\NormalTok{(}\FunctionTok{cor}\NormalTok{(f.PCAdata}\FloatTok{.1}\NormalTok{[}\FunctionTok{c}\NormalTok{(}\DecValTok{5}\SpecialCharTok{:}\DecValTok{25}\NormalTok{)]))}
+\FunctionTok{cpairs}\NormalTok{(f.PCAdata}\FloatTok{.1}\NormalTok{[}\FunctionTok{c}\NormalTok{(}\DecValTok{5}\SpecialCharTok{:}\DecValTok{25}\NormalTok{)], }\AttributeTok{panel.colors =}\NormalTok{ cor.colours, }\AttributeTok{gap =}\NormalTok{.}\DecValTok{5}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{NESE_HCPC_AllFemales_files/figure-latex/unnamed-chunk-2-1.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\#PCA}
+\NormalTok{PCA.f}\FloatTok{.1} \OtherTok{\textless{}{-}} \FunctionTok{prcomp}\NormalTok{(f.PCAdata}\FloatTok{.1}\NormalTok{[}\FunctionTok{c}\NormalTok{(}\DecValTok{5}\SpecialCharTok{:}\DecValTok{25}\NormalTok{)], }\AttributeTok{center =} \ConstantTok{TRUE}\NormalTok{, }\AttributeTok{scale =} \ConstantTok{TRUE}\NormalTok{)}
+\FunctionTok{summary}\NormalTok{(PCA.f}\FloatTok{.1}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Importance of components:
+##                           PC1    PC2    PC3     PC4     PC5     PC6     PC7
+## Standard deviation     2.2929 1.9821 1.6508 1.35424 1.23289 1.05868 1.00248
+## Proportion of Variance 0.2504 0.1871 0.1298 0.08733 0.07238 0.05337 0.04786
+## Cumulative Proportion  0.2504 0.4374 0.5672 0.65454 0.72693 0.78030 0.82815
+##                            PC8     PC9    PC10    PC11    PC12    PC13    PC14
+## Standard deviation     0.83669 0.81395 0.74682 0.57649 0.56711 0.52303 0.47535
+## Proportion of Variance 0.03334 0.03155 0.02656 0.01583 0.01531 0.01303 0.01076
+## Cumulative Proportion  0.86149 0.89304 0.91960 0.93542 0.95074 0.96376 0.97452
+##                           PC15    PC16    PC17    PC18    PC19      PC20
+## Standard deviation     0.42019 0.33961 0.30496 0.27771 0.27013 1.633e-09
+## Proportion of Variance 0.00841 0.00549 0.00443 0.00367 0.00347 0.000e+00
+## Cumulative Proportion  0.98293 0.98842 0.99285 0.99653 1.00000 1.000e+00
+##                             PC21
+## Standard deviation     1.138e-09
+## Proportion of Variance 0.000e+00
+## Cumulative Proportion  1.000e+00
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Plot the PCs to look at variance explained}
+\FunctionTok{pdf}\NormalTok{(}\StringTok{"../figures/PCAVariance\_All.pdf"}\NormalTok{)}
+\FunctionTok{screeplot}\NormalTok{(PCA.f}\FloatTok{.1}\NormalTok{, }\AttributeTok{type =} \StringTok{"l"}\NormalTok{, }\AttributeTok{npcs =} \DecValTok{12}\NormalTok{, }\AttributeTok{main =} \StringTok{"Screeplot of the first 12 PCs"}\NormalTok{)}
+\FunctionTok{abline}\NormalTok{(}\AttributeTok{h =} \DecValTok{1}\NormalTok{, }\AttributeTok{col=}\StringTok{"red"}\NormalTok{, }\AttributeTok{lty=}\DecValTok{5}\NormalTok{)}
+\FunctionTok{legend}\NormalTok{(}\StringTok{"topright"}\NormalTok{, }\AttributeTok{legend=}\FunctionTok{c}\NormalTok{(}\StringTok{"Eigenvalue = 1"}\NormalTok{),}
+       \AttributeTok{col=}\FunctionTok{c}\NormalTok{(}\StringTok{"red"}\NormalTok{), }\AttributeTok{lty=}\DecValTok{5}\NormalTok{, }\AttributeTok{cex=}\FloatTok{0.6}\NormalTok{)}
+\FunctionTok{dev.off}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## pdf 
+##   2
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Cumulative proportion}
+\NormalTok{cumpro }\OtherTok{\textless{}{-}} \FunctionTok{cumsum}\NormalTok{(PCA.f}\FloatTok{.1}\SpecialCharTok{$}\NormalTok{sdev}\SpecialCharTok{\^{}}\DecValTok{2} \SpecialCharTok{/} \FunctionTok{sum}\NormalTok{(PCA.f}\FloatTok{.1}\SpecialCharTok{$}\NormalTok{sdev}\SpecialCharTok{\^{}}\DecValTok{2}\NormalTok{))}
+\FunctionTok{pdf}\NormalTok{(}\StringTok{"../figures/PCACumumlativeVariance\_All.pdf"}\NormalTok{)}
+\FunctionTok{plot}\NormalTok{(cumpro[}\DecValTok{0}\SpecialCharTok{:}\DecValTok{12}\NormalTok{], }\AttributeTok{xlab =} \StringTok{"PC \#"}\NormalTok{, }\AttributeTok{ylab =} \StringTok{"Amount of explained variance"}\NormalTok{, }\AttributeTok{main =} \StringTok{"Cumulative variance plot"}\NormalTok{)}
+
+\FunctionTok{abline}\NormalTok{(}\AttributeTok{v =} \DecValTok{6}\NormalTok{, }\AttributeTok{col=}\StringTok{"blue"}\NormalTok{, }\AttributeTok{lty=}\DecValTok{5}\NormalTok{)}
+\FunctionTok{abline}\NormalTok{(}\AttributeTok{h =} \FloatTok{0.78030}\NormalTok{ , }\AttributeTok{col=}\StringTok{"blue"}\NormalTok{, }\AttributeTok{lty=}\DecValTok{5}\NormalTok{) }\CommentTok{\# Cumulative variance explained by the 10 PCs}
+\FunctionTok{legend}\NormalTok{(}\StringTok{"topleft"}\NormalTok{, }\AttributeTok{legend=}\FunctionTok{c}\NormalTok{(}\StringTok{"Cut{-}off @ PC 7"}\NormalTok{),}
+       \AttributeTok{col=}\FunctionTok{c}\NormalTok{(}\StringTok{"blue"}\NormalTok{), }\AttributeTok{lty=}\DecValTok{5}\NormalTok{, }\AttributeTok{cex=}\FloatTok{0.6}\NormalTok{)}
+\FunctionTok{dev.off}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## pdf 
+##   2
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Check the loadings and scores}
+\FunctionTok{pdf}\NormalTok{(}\StringTok{"../figures/PCAScores\_Trip\_All.pdf"}\NormalTok{)}
+\FunctionTok{autoplot}\NormalTok{(PCA.f}\FloatTok{.1}\NormalTok{, }\AttributeTok{data =}\NormalTok{ f.PCAdata}\FloatTok{.1}\NormalTok{, }\AttributeTok{colour =} \StringTok{\textquotesingle{}Trip\textquotesingle{}}\NormalTok{, }\AttributeTok{loadings =} \ConstantTok{TRUE}\NormalTok{, }
+         \AttributeTok{loadings.colour =} \StringTok{\textquotesingle{}blue\textquotesingle{}}\NormalTok{,}\AttributeTok{loadings.label =} \ConstantTok{TRUE}\NormalTok{, }\AttributeTok{loadings.label.size =} \DecValTok{3}\NormalTok{, }\AttributeTok{main =} \StringTok{"Trip"}\NormalTok{)}
+\FunctionTok{dev.off}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## pdf 
+##   2
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Check the loadings and scores}
+\FunctionTok{pdf}\NormalTok{(}\StringTok{"../figures/PCAScores\_Year\_All.pdf"}\NormalTok{)}
+\FunctionTok{autoplot}\NormalTok{(PCA.f}\FloatTok{.1}\NormalTok{, }\AttributeTok{data =}\NormalTok{ f.PCAdata}\FloatTok{.1}\NormalTok{, }\AttributeTok{colour =} \StringTok{\textquotesingle{}ProcedureYear\textquotesingle{}}\NormalTok{, }\AttributeTok{loadings =} \ConstantTok{TRUE}\NormalTok{, }
+         \AttributeTok{loadings.colour =} \StringTok{\textquotesingle{}blue\textquotesingle{}}\NormalTok{,}\AttributeTok{loadings.label =} \ConstantTok{TRUE}\NormalTok{, }\AttributeTok{loadings.label.size =} \DecValTok{3}\NormalTok{, }\AttributeTok{main =} \StringTok{"Year"}\NormalTok{)}
+\FunctionTok{dev.off}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## pdf 
+##   2
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Fancy plot with ellipses}
+\FunctionTok{pdf}\NormalTok{(}\StringTok{"../figures/PCAGroups\_Season.pdf"}\NormalTok{)}
+\FunctionTok{fviz\_pca\_ind}\NormalTok{(PCA.f}\FloatTok{.1}\NormalTok{, }\AttributeTok{geom.ind =} \StringTok{"point"}\NormalTok{, }\AttributeTok{pointshape =} \DecValTok{21}\NormalTok{, }
+             \AttributeTok{pointsize =} \DecValTok{2}\NormalTok{, }
+             \AttributeTok{fill.ind =}\NormalTok{ f.PCAdata}\FloatTok{.1}\SpecialCharTok{$}\NormalTok{Trip, }
+             \AttributeTok{col.ind =} \StringTok{"black"}\NormalTok{, }
+             \AttributeTok{palette =} \StringTok{"simpsons"}\NormalTok{, }
+             \AttributeTok{addEllipses =} \ConstantTok{TRUE}\NormalTok{,}
+             \AttributeTok{label =} \StringTok{"var"}\NormalTok{,}
+             \AttributeTok{col.var =} \StringTok{"black"}\NormalTok{,}
+             \AttributeTok{repel =} \ConstantTok{TRUE}\NormalTok{,}
+             \AttributeTok{legend.title =} \StringTok{"Trip"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{ggtitle}\NormalTok{(}\StringTok{"2D PCA{-}plot from trip variables"}\NormalTok{) }\SpecialCharTok{+}
+  \FunctionTok{theme}\NormalTok{(}\AttributeTok{plot.title =} \FunctionTok{element\_text}\NormalTok{(}\AttributeTok{hjust =} \FloatTok{0.5}\NormalTok{))}
+\FunctionTok{dev.off}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## pdf 
+##   2
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# HCPC with 6 PCs}
+\NormalTok{fPCAhc }\OtherTok{\textless{}{-}} \FunctionTok{scale}\NormalTok{(f.PCAdata}\FloatTok{.1}\NormalTok{[}\FunctionTok{c}\NormalTok{(}\DecValTok{5}\SpecialCharTok{:}\DecValTok{25}\NormalTok{)])}
+\NormalTok{res.pca.f}\FloatTok{.1} \OtherTok{\textless{}{-}} \FunctionTok{PCA}\NormalTok{(fPCAhc, }\AttributeTok{ncp =} \DecValTok{6}\NormalTok{, }\AttributeTok{graph =} \ConstantTok{FALSE}\NormalTok{)}
+
+\CommentTok{\# Extract the loadings}
+\NormalTok{loadings.pca.f}\FloatTok{.1}\OtherTok{=} \FunctionTok{sweep}\NormalTok{(res.pca.f}\FloatTok{.1}\SpecialCharTok{$}\NormalTok{var}\SpecialCharTok{$}\NormalTok{coord,}\DecValTok{2}\NormalTok{,}\FunctionTok{sqrt}\NormalTok{(res.pca.f}\FloatTok{.1}\SpecialCharTok{$}\NormalTok{eig[}\DecValTok{1}\SpecialCharTok{:}\FunctionTok{ncol}\NormalTok{(res.pca.f}\FloatTok{.1}\SpecialCharTok{$}\NormalTok{var}\SpecialCharTok{$}\NormalTok{coord),}\DecValTok{1}\NormalTok{]),}\AttributeTok{FUN=}\StringTok{"/"}\NormalTok{)}
+ 
+\CommentTok{\# Rotate the loadings }
+\NormalTok{loadings.pca.f}\FloatTok{.1} \OtherTok{\textless{}{-}} \FunctionTok{varimax}\NormalTok{(loadings.pca.f}\FloatTok{.1}\NormalTok{)}\SpecialCharTok{$}\NormalTok{loadings}
+
+\CommentTok{\# Replace the values using the rotated}
+\NormalTok{res.pca.f}\FloatTok{.1}\SpecialCharTok{$}\NormalTok{var}\SpecialCharTok{$}\NormalTok{coord }\OtherTok{\textless{}{-}}\NormalTok{ loadings.pca.f}\FloatTok{.1}
+
+\CommentTok{\# Extract the data to save}
+\NormalTok{pca.var }\OtherTok{\textless{}{-}} \FunctionTok{get\_pca}\NormalTok{(res.pca.f}\FloatTok{.1}\NormalTok{, }\AttributeTok{element =} \FunctionTok{c}\NormalTok{(}\StringTok{"var"}\NormalTok{, }\StringTok{"ind"}\NormalTok{))}
+\NormalTok{coord }\OtherTok{\textless{}{-}}\NormalTok{ pca.var[[}\StringTok{"coord"}\NormalTok{]]}
+\NormalTok{contrib }\OtherTok{\textless{}{-}}\NormalTok{ pca.var[[}\StringTok{"contrib"}\NormalTok{]]}
+
+\FunctionTok{write.csv}\NormalTok{(coord,}\StringTok{\textquotesingle{}../data/PCAcoord\_All.csv\textquotesingle{}}\NormalTok{)}
+\FunctionTok{write.csv}\NormalTok{(contrib,}\StringTok{\textquotesingle{}../data/PCAcontrib\_All.csv\textquotesingle{}}\NormalTok{)}
+
+
+\CommentTok{\# Compute hierarchical clustering on principal components}
+\NormalTok{res.hcpc}\FloatTok{.1} \OtherTok{\textless{}{-}} \FunctionTok{HCPC}\NormalTok{(res.pca.f}\FloatTok{.1}\NormalTok{, }\AttributeTok{metric =} \StringTok{"euclidean"}\NormalTok{, }\AttributeTok{method =} \StringTok{"ward"}\NormalTok{, }\AttributeTok{graph =} \ConstantTok{FALSE}\NormalTok{)}
+
+\FunctionTok{plot}\NormalTok{(res.hcpc}\FloatTok{.1}\NormalTok{) }\CommentTok{\# 5 clusters}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{NESE_HCPC_AllFemales_files/figure-latex/unnamed-chunk-2-2.pdf}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Check that k is right}
+\NormalTok{ind.PCA }\OtherTok{\textless{}{-}} \FunctionTok{get\_pca\_ind}\NormalTok{(res.pca.f}\FloatTok{.1}\NormalTok{)}
+\NormalTok{ind.PCA }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(ind.PCA}\SpecialCharTok{$}\NormalTok{coord[,}\DecValTok{1}\SpecialCharTok{:}\DecValTok{6}\NormalTok{])}
+\NormalTok{ind.PCA }\OtherTok{\textless{}{-}}\NormalTok{ tibble}\SpecialCharTok{::}\FunctionTok{rownames\_to\_column}\NormalTok{(ind.PCA, }\StringTok{"AnimalID"}\NormalTok{)}
+\NormalTok{col2keep }\OtherTok{\textless{}{-}} \FunctionTok{colnames}\NormalTok{(ind.PCA)}
+\NormalTok{col2keep }\OtherTok{\textless{}{-}} \FunctionTok{c}\NormalTok{(}\StringTok{"Dim.1"}\NormalTok{,}\StringTok{"Dim.2"}\NormalTok{,}\StringTok{"Dim.3"}\NormalTok{,}\StringTok{"Dim.4"}\NormalTok{,}\StringTok{"Dim.5"}\NormalTok{, }\StringTok{"Dim.6"}\NormalTok{)}
+\NormalTok{ind.PCA }\OtherTok{\textless{}{-}}\NormalTok{ ind.PCA[,col2keep]}
+
+\NormalTok{res.nbclust }\OtherTok{\textless{}{-}} \FunctionTok{NbClust}\NormalTok{(ind.PCA, }\AttributeTok{distance =} \StringTok{"euclidean"}\NormalTok{,}
+                       \AttributeTok{min.nc =} \DecValTok{2}\NormalTok{, }\AttributeTok{max.nc =} \DecValTok{15}\NormalTok{, }
+                       \AttributeTok{method =} \StringTok{"ward.D"}\NormalTok{, }\AttributeTok{index =}\StringTok{"all"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning in pf(beale, pp, df2): NaNs produced
+\end{verbatim}
+
+\includegraphics{NESE_HCPC_AllFemales_files/figure-latex/unnamed-chunk-2-3.pdf}
+
+\begin{verbatim}
+## *** : The Hubert index is a graphical method of determining the number of clusters.
+##                 In the plot of Hubert index, we seek a significant knee that corresponds to a 
+##                 significant increase of the value of the measure i.e the significant peak in Hubert
+##                 index second differences plot. 
+## 
+\end{verbatim}
+
+\includegraphics{NESE_HCPC_AllFemales_files/figure-latex/unnamed-chunk-2-4.pdf}
+
+\begin{verbatim}
+## *** : The D index is a graphical method of determining the number of clusters. 
+##                 In the plot of D index, we seek a significant knee (the significant peak in Dindex
+##                 second differences plot) that corresponds to a significant increase of the value of
+##                 the measure. 
+##  
+## ******************************************************************* 
+## * Among all indices:                                                
+## * 3 proposed 2 as the best number of clusters 
+## * 5 proposed 3 as the best number of clusters 
+## * 1 proposed 4 as the best number of clusters 
+## * 5 proposed 5 as the best number of clusters 
+## * 1 proposed 9 as the best number of clusters 
+## * 6 proposed 10 as the best number of clusters 
+## * 1 proposed 13 as the best number of clusters 
+## * 2 proposed 15 as the best number of clusters 
+## 
+##                    ***** Conclusion *****                            
+##  
+## * According to the majority rule, the best number of clusters is  10 
+##  
+##  
+## *******************************************************************
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Agree that 10 is the correct number of clusters}
+\CommentTok{\# Compute hierarchical clustering on principal components}
+\NormalTok{res.hcpc}\FloatTok{.1} \OtherTok{\textless{}{-}} \FunctionTok{HCPC}\NormalTok{(res.pca.f}\FloatTok{.1}\NormalTok{,}
+                      \AttributeTok{nb.clust =} \DecValTok{10}\NormalTok{,}
+                      \AttributeTok{metric =} \StringTok{"euclidean"}\NormalTok{, }
+                      \AttributeTok{method =} \StringTok{"ward"}\NormalTok{, }
+                      \AttributeTok{graph =} \ConstantTok{FALSE}\NormalTok{)}
+
+\FunctionTok{pdf}\NormalTok{(}\StringTok{"../figures/PCA\_HCPC\_Season.pdf"}\NormalTok{)}
+\FunctionTok{fviz\_dend}\NormalTok{(res.hcpc}\FloatTok{.1}\NormalTok{, }
+          \AttributeTok{cex =} \FloatTok{0.7}\NormalTok{,                     }\CommentTok{\# Label size}
+          \AttributeTok{palette =} \StringTok{"jco"}\NormalTok{,               }\CommentTok{\# Color palette see ?ggpubr::ggpar}
+          \AttributeTok{rect =} \ConstantTok{TRUE}\NormalTok{, }\AttributeTok{rect\_fill =} \ConstantTok{TRUE}\NormalTok{, }\CommentTok{\# Add rectangle around groups}
+          \AttributeTok{rect\_border =} \StringTok{"jco"}\NormalTok{,           }\CommentTok{\# Rectangle color}
+          \AttributeTok{labels\_track\_height =} \FloatTok{0.8}\NormalTok{,      }\CommentTok{\# Augment the room for labels}
+          \AttributeTok{main =} \StringTok{"Cluster analysis for all females"}
+\NormalTok{                    )}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Registered S3 method overwritten by 'dendextend':
+##   method     from 
+##   rev.hclust vegan
+\end{verbatim}
+
+\begin{verbatim}
+## Warning: The `<scale>` argument of `guides()` cannot be `FALSE`. Use "none" instead as
+## of ggplot2 3.3.4.
+## i The deprecated feature was likely used in the factoextra package.
+##   Please report the issue at <https://github.com/kassambara/factoextra/issues>.
+## This warning is displayed once every 8 hours.
+## Call `lifecycle::last_lifecycle_warnings()` to see where this warning was
+## generated.
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{dev.off}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## pdf 
+##   2
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Bi{-}space}
+\FunctionTok{pdf}\NormalTok{(}\StringTok{"../figures/PCA\_HCPC2D\_Season.pdf"}\NormalTok{)}
+\FunctionTok{fviz\_cluster}\NormalTok{(res.hcpc}\FloatTok{.1}\NormalTok{,}
+             \AttributeTok{repel =} \ConstantTok{TRUE}\NormalTok{,            }\CommentTok{\# Avoid label overlapping}
+             \AttributeTok{show.clust.cent =} \ConstantTok{TRUE}\NormalTok{, }\CommentTok{\# Show cluster centers}
+             \AttributeTok{palette =} \StringTok{"jco"}\NormalTok{,         }\CommentTok{\# Color palette see ?ggpubr::ggpar}
+             \AttributeTok{ggtheme =} \FunctionTok{theme\_minimal}\NormalTok{(),}
+             \AttributeTok{main =} \StringTok{"Factor map"}
+\NormalTok{             )}
+\FunctionTok{dev.off}\NormalTok{()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## pdf 
+##   2
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Summary table}
+\NormalTok{sum.whole }\OtherTok{\textless{}{-}} \FunctionTok{summary\_table}\NormalTok{(f.PCAdata}\FloatTok{.1}\NormalTok{, our\_summary1)}
+\NormalTok{sum.whole}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## \begin{tabular}{l|l}
+## \hline
+##  & f.PCAdata.1 (N = 180)\\
+## \hline
+## \bf{d13C} & ~\\
+## \hline
+## ~~ mean (sd) & -19.44 $\pm$ 0.29\\
+## \hline
+## \bf{d15N} & ~\\
+## \hline
+## ~~ mean (sd) & 14.64 $\pm$ 0.85\\
+## \hline
+## \bf{MaxLat_degrees} & ~\\
+## \hline
+## ~~ mean (sd) & 48.13 $\pm$ 4.46\\
+## \hline
+## \bf{MinLon_degrees} & ~\\
+## \hline
+## ~~ mean (sd) & 209.89 $\pm$ 14.19\\
+## \hline
+## \bf{MedianDistToContShelf_km} & ~\\
+## \hline
+## ~~ mean (sd) & 689.89 $\pm$ 376.50\\
+## \hline
+## \bf{SdDistContShelf_km} & ~\\
+## \hline
+## ~~ mean (sd) & 281.94 $\pm$ 133.19\\
+## \hline
+## \bf{MesoEcoProportionShelf} & ~\\
+## \hline
+## ~~ mean (sd) & 0.02 $\pm$ 0.04\\
+## \hline
+## \bf{MesoEcoProportionCAC} & ~\\
+## \hline
+## ~~ mean (sd) & 0.29 $\pm$ 0.19\\
+## \hline
+## \bf{MesoEcoProportionSubArcticPac} & ~\\
+## \hline
+## ~~ mean (sd) & 0.43 $\pm$ 0.30\\
+## \hline
+## \bf{MesoEcoProportionNorthCPac} & ~\\
+## \hline
+## ~~ mean (sd) & 0.25 $\pm$ 0.28\\
+## \hline
+## \bf{Mean_Depth_m} & ~\\
+## \hline
+## ~~ mean (sd) & 521.03 $\pm$ 48.16\\
+## \hline
+## \bf{Mean_Depth_sd} & ~\\
+## \hline
+## ~~ mean (sd) & 161.79 $\pm$ 24.88\\
+## \hline
+## \bf{Mean_Duration_sec} & ~\\
+## \hline
+## ~~ mean (sd) & 1,403.61 $\pm$ 155.66\\
+## \hline
+## \bf{Mean_Duration_sd} & ~\\
+## \hline
+## ~~ mean (sd) & 359.49 $\pm$ 86.36\\
+## \hline
+## \bf{Pct_TransitDives} & ~\\
+## \hline
+## ~~ mean (sd) & 30.53 $\pm$ 9.36\\
+## \hline
+## \bf{Pct_ForagingDives} & ~\\
+## \hline
+## ~~ mean (sd) & 52.47 $\pm$ 11.38\\
+## \hline
+## \bf{Pct_DriftDives} & ~\\
+## \hline
+## ~~ mean (sd) & 10.16 $\pm$ 4.70\\
+## \hline
+## \bf{Pct_BenthicDives} & ~\\
+## \hline
+## ~~ mean (sd) & 0.07 $\pm$ 0.08\\
+## \hline
+## \bf{PctTripDiving} & ~\\
+## \hline
+## ~~ mean (sd) & 91.58 $\pm$ 4.36\\
+## \hline
+## \bf{DeepDayForageDivesMedian_m} & ~\\
+## \hline
+## ~~ mean (sd) & -628.49 $\pm$ 58.31\\
+## \hline
+## \bf{DeepNightForageDivesMedian_m} & ~\\
+## \hline
+## ~~ mean (sd) & -514.78 $\pm$ 53.03\\
+## \hline
+## \end{tabular}
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{f.PCAdata}\FloatTok{.1}\SpecialCharTok{$}\NormalTok{clusterAll }\OtherTok{\textless{}{-}} \FunctionTok{paste}\NormalTok{(}\StringTok{\textquotesingle{}Cluster\textquotesingle{}}\NormalTok{,res.hcpc}\FloatTok{.1}\SpecialCharTok{$}\NormalTok{data.clust}\SpecialCharTok{$}\NormalTok{clust)}
+\FunctionTok{write.csv}\NormalTok{(f.PCAdata}\FloatTok{.1}\NormalTok{,}\StringTok{\textquotesingle{}../data/All\_Clusters.csv\textquotesingle{}}\NormalTok{)}
+
+
+\FunctionTok{saveRDS}\NormalTok{(f.PCAdata}\FloatTok{.1}\NormalTok{, }\AttributeTok{file =} \StringTok{\textquotesingle{}../data/f.PCAdata.1.rds\textquotesingle{}}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+
+\end{document}

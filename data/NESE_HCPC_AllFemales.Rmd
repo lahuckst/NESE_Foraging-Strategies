@@ -1,0 +1,255 @@
+---
+title: "NESE_HCPC AllFemales"
+author: "Luis Huckstadt"
+date: "2024-07-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load all libraries
+```{r}
+
+library(gclus)
+library(SIBER)
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(factoextra)
+library(ggfortify)
+library(pls)
+library(FactoMineR)
+library(tibble)
+library(nicheROVER)
+library(mclust)
+library(qwraps2)
+library(ggstatsplot)
+library(dispRity)
+library(NbClust)
+
+#############################
+#############################
+###    DEFINE SUMMARY     ###
+#############################
+#############################
+
+# Text to create summary talble for variables
+our_summary1 <-
+  list("d13C" = list("mean (sd)" = ~ qwraps2::mean_sd(d13C)),
+       "d15N" = list("mean (sd)" = ~ qwraps2::mean_sd(d15N)),
+       "MaxLat_degrees" = list("mean (sd)" = ~ qwraps2::mean_sd(MaxLat_degrees)),
+       "MinLon_degrees" = list("mean (sd)" = ~ qwraps2::mean_sd(MinLon_degrees)),
+       "MedianDistToContShelf_km" = list("mean (sd)" = ~ qwraps2::mean_sd(MedianDistToContShelf_km)),
+       "SdDistContShelf_km" = list("mean (sd)" = ~ qwraps2::mean_sd(SdDistContShelf_km)),
+       "MesoEcoProportionShelf" = list("mean (sd)" = ~ qwraps2::mean_sd(MesoEcoProportionShelf)),
+       "MesoEcoProportionCAC" = list("mean (sd)" = ~ qwraps2::mean_sd(MesoEcoProportionCAC)),
+       "MesoEcoProportionSubArcticPac" = list("mean (sd)" = ~ qwraps2::mean_sd(MesoEcoProportionSubArcticPac)),
+       "MesoEcoProportionNorthCPac" = list("mean (sd)" = ~ qwraps2::mean_sd(MesoEcoProportionNorthCPac)),
+       "Mean_Depth_m" = list("mean (sd)" = ~ qwraps2::mean_sd(Mean_Depth_m)),
+       "Mean_Depth_sd" = list("mean (sd)" = ~ qwraps2::mean_sd(Mean_Depth_sd)),
+       "Mean_Duration_sec" = list("mean (sd)" = ~ qwraps2::mean_sd(Mean_Duration_sec)),
+       "Mean_Duration_sd" = list("mean (sd)" = ~ qwraps2::mean_sd(Mean_Duration_sd)),
+       "Pct_TransitDives" = list("mean (sd)" = ~ qwraps2::mean_sd(Pct_TransitDives)),
+       "Pct_ForagingDives" = list("mean (sd)" = ~ qwraps2::mean_sd(Pct_ForagingDives)),
+       "Pct_DriftDives" = list("mean (sd)" = ~ qwraps2::mean_sd(Pct_DriftDives)),
+       "Pct_BenthicDives" = list("mean (sd)" = ~ qwraps2::mean_sd(Pct_BenthicDives)),
+       "PctTripDiving" = list("mean (sd)" = ~ qwraps2::mean_sd(PctTripDiving)),
+       "DeepDayForageDivesMedian_m" = list("mean (sd)" = ~ qwraps2::mean_sd(DeepDayForageDivesMedian_m)),
+       "DeepNightForageDivesMedian_m" = list("mean (sd)" = ~ qwraps2::mean_sd(DeepNightForageDivesMedian_m))
+  )
+```
+
+
+HCPC analysis for all NESE females
+```{r}
+
+data.iso <- readRDS("../data/data_iso.rds")
+
+col4PCA <- c('TOPPID','Trip','Sex','ProcedureYear','d13C',	'd15N', 
+             'MaxLat_degrees','MinLon_degrees','MedianDistToContShelf_km',	
+             'SdDistContShelf_km','MesoEcoProportionShelf',	
+             'MesoEcoProportionCAC','MesoEcoProportionSubArcticPac',	
+             'MesoEcoProportionNorthCPac','Mean_Depth_m', 'Mean_Depth_sd',
+             'Mean_Duration_sec', 'Mean_Duration_sd', 'Pct_TransitDives', 
+             'Pct_ForagingDives', 'Pct_DriftDives', 'Pct_BenthicDives',	
+             'PctTripDiving', 'DeepDayForageDivesMedian_m', 
+             'DeepNightForageDivesMedian_m') 
+
+
+PCAdata <- data.iso[,col4PCA] # 306 cases  
+PCAdata$DeepDayForageDivesMedian_m <- PCAdata$DeepDayForageDivesMedian_m *-1
+PCAdata$DeepNightForageDivesMedian_m <- PCAdata$DeepNightForageDivesMedian_m *-1
+PCAdata$ProcedureYear <- as.factor(PCAdata$ProcedureYear)
+f.PCAdata <- dplyr::filter(PCAdata, Sex == "Female") # Extract the data just for females , 180 females
+
+
+#First exploratory PCA with all data, including Isotopes
+f.PCAdata.1 <- na.omit(f.PCAdata)
+row.names(f.PCAdata.1) <- f.PCAdata.1$TOPPID
+#f.PCAdata.1[1] <- NULL
+
+# Correlation Matrix plot
+cor.data <- abs(cor(f.PCAdata.1[c(5:25)]))
+cor.colours <- dmat.color(cor.data)
+cor.ordered <- order.single(cor(f.PCAdata.1[c(5:25)]))
+cpairs(f.PCAdata.1[c(5:25)], panel.colors = cor.colours, gap =.5)
+
+#PCA
+PCA.f.1 <- prcomp(f.PCAdata.1[c(5:25)], center = TRUE, scale = TRUE)
+summary(PCA.f.1)
+
+# Plot the PCs to look at variance explained
+pdf("../figures/PCAVariance_All.pdf")
+screeplot(PCA.f.1, type = "l", npcs = 12, main = "Screeplot of the first 12 PCs")
+abline(h = 1, col="red", lty=5)
+legend("topright", legend=c("Eigenvalue = 1"),
+       col=c("red"), lty=5, cex=0.6)
+dev.off()
+
+screeplot(PCA.f.1, type = "l", npcs = 12, main = "Screeplot of the first 12 PCs")
+abline(h = 1, col="red", lty=5)
+legend("topright", legend=c("Eigenvalue = 1"),
+       col=c("red"), lty=5, cex=0.6)
+
+# Cumulative proportion
+cumpro <- cumsum(PCA.f.1$sdev^2 / sum(PCA.f.1$sdev^2))
+pdf("../figures/PCACumumlativeVariance_All.pdf")
+plot(cumpro[0:12], xlab = "PC #", ylab = "Amount of explained variance", main = "Cumulative variance plot")
+abline(v = 6, col="blue", lty=5)
+abline(h = 0.78030 , col="blue", lty=5) # Cumulative variance explained by the 10 PCs
+legend("topleft", legend=c("Cut-off @ PC 7"),
+       col=c("blue"), lty=5, cex=0.6)
+dev.off()
+
+plot(cumpro[0:12], xlab = "PC #", ylab = "Amount of explained variance", main = "Cumulative variance plot")
+abline(v = 6, col="blue", lty=5)
+abline(h = 0.78030 , col="blue", lty=5) # Cumulative variance explained by the 10 PCs
+legend("topleft", legend=c("Cut-off @ PC 7"),
+       col=c("blue"), lty=5, cex=0.6)
+
+# Check the loadings and scores
+pdf("../figures/PCAScores_Trip_All.pdf")
+autoplot(PCA.f.1, data = f.PCAdata.1, colour = 'Trip', loadings = TRUE, 
+         loadings.colour = 'blue',loadings.label = TRUE, loadings.label.size = 3, main = "Trip")
+dev.off()
+
+autoplot(PCA.f.1, data = f.PCAdata.1, colour = 'Trip', loadings = TRUE, 
+         loadings.colour = 'blue',loadings.label = TRUE, loadings.label.size = 3, main = "Trip")
+
+# Check the loadings and scores
+pdf("../figures/PCAScores_Year_All.pdf")
+autoplot(PCA.f.1, data = f.PCAdata.1, colour = 'ProcedureYear', loadings = TRUE, 
+         loadings.colour = 'blue',loadings.label = TRUE, loadings.label.size = 3, main = "Year")
+dev.off()
+
+autoplot(PCA.f.1, data = f.PCAdata.1, colour = 'ProcedureYear', loadings = TRUE, 
+         loadings.colour = 'blue',loadings.label = TRUE, loadings.label.size = 3, main = "Year")
+
+# Fancy plot with ellipses
+f <- fviz_pca_ind(PCA.f.1, geom.ind = "point", pointshape = 21, 
+             pointsize = 2, 
+             fill.ind = f.PCAdata.1$Trip, 
+             col.ind = "black", 
+             palette = "simpsons", 
+             addEllipses = TRUE,
+             label = "var",
+             col.var = "black",
+             repel = TRUE,
+             legend.title = "Trip") +
+  ggtitle("2D PCA-plot from trip variables") +
+  theme(plot.title = element_text(hjust = 0.5))
+print(f)
+ggsave(filename = "../figures/PCAGroups_Season.pdf",
+       plot = f,
+       device = cairo_pdf)
+
+# HCPC with 6 PCs
+fPCAhc <- scale(f.PCAdata.1[c(5:25)])
+res.pca.f.1 <- PCA(fPCAhc, ncp = 6, graph = FALSE)
+
+# Extract the loadings
+loadings.pca.f.1= sweep(res.pca.f.1$var$coord,2,sqrt(res.pca.f.1$eig[1:ncol(res.pca.f.1$var$coord),1]),FUN="/")
+ 
+# Rotate the loadings 
+loadings.pca.f.1 <- varimax(loadings.pca.f.1)$loadings
+
+# Replace the values using the rotated
+res.pca.f.1$var$coord <- loadings.pca.f.1
+
+# Extract the data to save
+pca.var <- get_pca(res.pca.f.1, element = c("var", "ind"))
+coord <- pca.var[["coord"]]
+contrib <- pca.var[["contrib"]]
+
+write.csv(coord,'../results/PCAcoord_All.csv')
+write.csv(contrib,'../results/PCAcontrib_All.csv')
+
+
+# Compute hierarchical clustering on principal components
+res.hcpc.1 <- HCPC(res.pca.f.1, metric = "euclidean", method = "ward", graph = FALSE)
+
+plot(res.hcpc.1) # 5 clusters
+
+# Check that k is right
+ind.PCA <- get_pca_ind(res.pca.f.1)
+ind.PCA <- data.frame(ind.PCA$coord[,1:6])
+ind.PCA <- tibble::rownames_to_column(ind.PCA, "AnimalID")
+col2keep <- colnames(ind.PCA)
+col2keep <- c("Dim.1","Dim.2","Dim.3","Dim.4","Dim.5", "Dim.6")
+ind.PCA <- ind.PCA[,col2keep]
+
+res.nbclust <- NbClust(ind.PCA, distance = "euclidean",
+                       min.nc = 2, max.nc = 15, 
+                       method = "ward.D", index ="all")
+
+# Agree that 10 is the correct number of clusters
+# Compute hierarchical clustering on principal components
+res.hcpc.1 <- HCPC(res.pca.f.1,
+                      nb.clust = 10,
+                      metric = "euclidean", 
+                      method = "ward", 
+                      graph = FALSE)
+
+# Plot
+f <- fviz_dend(res.hcpc.1, 
+          cex = 0.7,                     # Label size
+          palette = "jco",               # Color palette see ?ggpubr::ggpar
+          rect = TRUE, rect_fill = TRUE, # Add rectangle around groups
+          rect_border = "jco",           # Rectangle color
+          labels_track_height = 0.8,      # Augment the room for labels
+          main = "Cluster analysis for all females"
+                    )
+print(f)
+ggsave(filename = "../figures/PCA_HCPC_Season.pdf",
+       plot = f,
+       device = cairo_pdf)
+
+
+# Bi-space
+f <- fviz_cluster(res.hcpc.1,
+             repel = TRUE,            # Avoid label overlapping
+             show.clust.cent = TRUE, # Show cluster centers
+             palette = "jco",         # Color palette see ?ggpubr::ggpar
+             ggtheme = theme_minimal(),
+             main = "Factor map"
+             )
+
+print(f)
+ggsave(filename = "../figures/PCA_HCPC2D_Season.pdf",
+       plot = f,
+       device = cairo_pdf)
+
+
+# Summary table
+sum.whole <- summary_table(f.PCAdata.1, our_summary1)
+sum.whole
+
+f.PCAdata.1$clusterAll <- paste('Cluster',res.hcpc.1$data.clust$clust)
+write.csv(f.PCAdata.1,'../results/All_Clusters.csv')
+
+
+saveRDS(f.PCAdata.1, file = '../data/f.PCAdata.1.rds')
+
+```

@@ -1,0 +1,411 @@
+---
+title: "NESE_HCPC_PostMolt"
+author: "Luis Huckstadt"
+date: "2024-07-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Load all libraries
+```{r}
+
+library(gclus)
+library(SIBER)
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(factoextra)
+library(ggfortify)
+library(pls)
+library(FactoMineR)
+library(tibble)
+library(nicheROVER)
+library(mclust)
+library(qwraps2)
+library(ggstatsplot)
+library(dispRity)
+library(NbClust)
+
+#############################
+#############################
+###    DEFINE SUMMARY     ###
+#############################
+#############################
+
+# Text to create summary talble for variables
+our_summary1 <-
+  list("d13C" = list("mean (sd)" = ~ qwraps2::mean_sd(d13C)),
+       "d15N" = list("mean (sd)" = ~ qwraps2::mean_sd(d15N)),
+       "MaxLat_degrees" = list("mean (sd)" = ~ qwraps2::mean_sd(MaxLat_degrees)),
+       "MinLon_degrees" = list("mean (sd)" = ~ qwraps2::mean_sd(MinLon_degrees)),
+       "MedianDistToContShelf_km" = list("mean (sd)" = ~ qwraps2::mean_sd(MedianDistToContShelf_km)),
+       "SdDistContShelf_km" = list("mean (sd)" = ~ qwraps2::mean_sd(SdDistContShelf_km)),
+       "MesoEcoProportionShelf" = list("mean (sd)" = ~ qwraps2::mean_sd(MesoEcoProportionShelf)),
+       "MesoEcoProportionCAC" = list("mean (sd)" = ~ qwraps2::mean_sd(MesoEcoProportionCAC)),
+       "MesoEcoProportionSubArcticPac" = list("mean (sd)" = ~ qwraps2::mean_sd(MesoEcoProportionSubArcticPac)),
+       "MesoEcoProportionNorthCPac" = list("mean (sd)" = ~ qwraps2::mean_sd(MesoEcoProportionNorthCPac)),
+       "Mean_Depth_m" = list("mean (sd)" = ~ qwraps2::mean_sd(Mean_Depth_m)),
+       "Mean_Depth_sd" = list("mean (sd)" = ~ qwraps2::mean_sd(Mean_Depth_sd)),
+       "Mean_Duration_sec" = list("mean (sd)" = ~ qwraps2::mean_sd(Mean_Duration_sec)),
+       "Mean_Duration_sd" = list("mean (sd)" = ~ qwraps2::mean_sd(Mean_Duration_sd)),
+       "Pct_TransitDives" = list("mean (sd)" = ~ qwraps2::mean_sd(Pct_TransitDives)),
+       "Pct_ForagingDives" = list("mean (sd)" = ~ qwraps2::mean_sd(Pct_ForagingDives)),
+       "Pct_DriftDives" = list("mean (sd)" = ~ qwraps2::mean_sd(Pct_DriftDives)),
+       "Pct_BenthicDives" = list("mean (sd)" = ~ qwraps2::mean_sd(Pct_BenthicDives)),
+       "PctTripDiving" = list("mean (sd)" = ~ qwraps2::mean_sd(PctTripDiving)),
+       "DeepDayForageDivesMedian_m" = list("mean (sd)" = ~ qwraps2::mean_sd(DeepDayForageDivesMedian_m)),
+       "DeepNightForageDivesMedian_m" = list("mean (sd)" = ~ qwraps2::mean_sd(DeepNightForageDivesMedian_m))
+  )
+
+# Import the data
+f.PCAdata.1 <- readRDS("../data/f.PCAdata.1.rds")
+
+```
+
+
+Analysis for female PM NESE 
+
+```{r}
+f.PCAdata.PM <- filter(f.PCAdata.1, Trip == "PostMolt") # Extract the data just for Females PM
+row.names(f.PCAdata.PM) <- f.PCAdata.PM$TOPPID
+
+#First exploratory PCA with all data, including Isotopes
+PCA.f.1.PM <- prcomp(f.PCAdata.PM[c(5:25)], center = TRUE, scale = TRUE)
+summary(PCA.f.1.PM)
+get_eigenvalue(PCA.f.1.PM)
+
+# Plot the PCs to look at variance explained
+pdf("../figures/PCAVariance_PM.pdf")
+screeplot(PCA.f.1.PM, type = "l", npcs = 10, main = "Screeplot of the first 10 PCs")
+abline(h = 1, col="red", lty=5)
+legend("topright", legend=c("Eigenvalue = 1"),
+       col=c("red"), lty=5, cex=0.6)
+dev.off()
+
+screeplot(PCA.f.1.PM, type = "l", npcs = 10, main = "Screeplot of the first 10 PCs")
+abline(h = 1, col="red", lty=5)
+legend("topright", legend=c("Eigenvalue = 1"),
+       col=c("red"), lty=5, cex=0.6)
+
+# Cumulative proportion
+cumpro <- cumsum(PCA.f.1.PM$sdev^2 / sum(PCA.f.1.PM$sdev^2))
+pdf("../figures/PCACumulativeVariance_PM.pdf")
+plot(cumpro[0:10], xlab = "PC #", ylab = "Amount of explained variance", main = "Cumulative variance plot")
+abline(v = 6, col="blue", lty=5)
+abline(h = 0.77320, col="blue", lty=5) # Cumulative variance explained by the 10 PCs
+legend("topleft", legend=c("Cut-off @ PC 6"),
+       col=c("blue"), lty=5, cex=0.6)
+dev.off()
+
+plot(cumpro[0:10], xlab = "PC #", ylab = "Amount of explained variance", main = "Cumulative variance plot")
+abline(v = 6, col="blue", lty=5)
+abline(h = 0.77320, col="blue", lty=5) # Cumulative variance explained by the 10 PCs
+legend("topleft", legend=c("Cut-off @ PC 6"),
+       col=c("blue"), lty=5, cex=0.6)
+
+# Check the loadings and scores
+pdf("../figures/PCAScores_PM.pdf")
+autoplot(PCA.f.1.PM, data = f.PCAdata.PM, colour = 'ProcedureYear', loadings = TRUE, 
+         loadings.colour = 'blue',loadings.label = TRUE, loadings.label.size = 3, main = "Year")
+dev.off()
+
+autoplot(PCA.f.1.PM, data = f.PCAdata.PM, colour = 'ProcedureYear', loadings = TRUE, 
+         loadings.colour = 'blue',loadings.label = TRUE, loadings.label.size = 3, main = "Year")
+
+# Fancy plot with ellipses
+f <- fviz_pca_ind(PCA.f.1.PM, geom.ind = "point", pointshape = 21, 
+             pointsize = 2, 
+             fill.ind = f.PCAdata.PM$ProcedureYear, 
+             col.ind = "black", 
+             palette = "simpsons", 
+             addEllipses = TRUE,
+             label = "var",
+             col.var = "black",
+             repel = TRUE,
+             legend.title = "Year") +
+  ggtitle("2D PCA-plot from trip variables") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+print(f)
+
+ggsave(filename = "../figures/PCAGroups_PM.pdf",
+       plot = f,
+       device = cairo_pdf)
+
+# HCPC with 6 PCs
+fPCAhc.PM <- scale(f.PCAdata.PM[c(5:25)])
+res.pca.f.1.PM <- PCA(fPCAhc.PM, ncp = 6, graph = FALSE)
+
+# Extract the loadings
+loadings.pca.f.1.PM <- sweep(res.pca.f.1.PM$var$coord,2,sqrt(res.pca.f.1.PM$eig[1:ncol(res.pca.f.1.PM$var$coord),1]),FUN="/")
+ 
+# Rotate the loadings 
+loadings.pca.f.1.PM <- varimax(loadings.pca.f.1.PM)$loadings
+
+# Replace the values using the rotated
+res.pca.f.1.PM$var$coord <- loadings.pca.f.1.PM
+pca.var <- get_pca(res.pca.f.1.PM, element = c("var", "ind"))
+
+coord <- pca.var[["coord"]]
+contrib <- pca.var[["contrib"]]
+
+write.csv(coord,'../results/PCAcoord_PM.csv')
+write.csv(contrib,'../results/PCAcontrib_PM.csv')
+
+
+# Compute hierarchical clustering on principal components
+res.hcpc.1.PM <- HCPC(res.pca.f.1.PM,
+                      kk = Inf,
+                      min = 3,
+                      max = 10,
+                      consol = TRUE,
+                      metric = "euclidean", 
+                      method = "ward", 
+                      graph = FALSE)
+
+plot(res.hcpc.1.PM) # 3 clusters
+
+# Check that k is right
+ind.PCAPM <- get_pca_ind(res.pca.f.1.PM)
+ind.PCAPM <- data.frame(ind.PCAPM$coord[,1:6])
+#ind.PCAPM <- tibble::rownames_to_column(ind.PCAPM, "AnimalID")
+#col2keep <- c("Dim.1","Dim.2","Dim.3","Dim.4","Dim.5", "Dim.6")
+#ind.PCAM2 <- ind.PCAPM[,col2keep]
+
+res.nbclust <- NbClust(ind.PCAPM, distance = "euclidean",
+                       min.nc = 2, max.nc = 15, 
+                       method = "ward.D", index ="alllong")
+
+# Agree that 5 is the correct number of clusters
+# Compute hierarchical clustering on principal components
+res.hcpc.1.PM <- HCPC(res.pca.f.1.PM,
+                      nb.clust = 5,
+                      metric = "euclidean", 
+                      method = "ward", 
+                      graph = FALSE)
+
+f <- fviz_dend(res.hcpc.1.PM, 
+          cex = 0.7,                     # Label size
+          palette = "jco",               # Color palette see ?ggpubr::ggpar
+          rect = TRUE, rect_fill = TRUE, # Add rectangle around groups
+          rect_border = "jco",           # Rectangle color
+          labels_track_height = 0.8,      # Augment the room for labels
+          main = "Cluster analysis for all females - PM Trip"
+                    )
+print(f)
+ggsave(filename = "../figures/PCA_HCPC_PM.pdf",
+       plot = f,
+       device = cairo_pdf)
+
+# Bi-space
+f <- fviz_cluster(res.hcpc.1.PM,
+             repel = TRUE,            # Avoid label overlapping
+             show.clust.cent = TRUE, # Show cluster centers
+             palette = "jco",         # Color palette see ?ggpubr::ggpar
+             ggtheme = theme_minimal(),
+             main = "Factor map"
+             )
+print(f)
+ggsave(filename = "../figures/PCA_HCPC2D_PM.pdf",
+       plot = f,
+       device = cairo_pdf)
+
+#Add the clusters to the original dataset
+
+f.PCAdata.PM$cluster <- paste('Cluster',res.hcpc.1.PM$data.clust$clust)
+write.csv(f.PCAdata.PM,'../results/PM_Clusters.csv')
+
+################################################################################################################################################################################################################
+
+# Extract the PCA values
+ind.PCAPM <- get_pca_ind(PCA.f.1.PM)
+ind.PCAPM <- data.frame(ind.PCAPM$coord[,1:6])
+ind.PCAPM <- tibble::rownames_to_column(ind.PCAPM, "AnimalID")
+
+d <- 6
+Psi <- crossprod(matrix(rnorm(d^2), d, d)) # scale
+
+temp <-  tibble::rownames_to_column(f.PCAdata.PM, "AnimalID")
+data4Niche.PM <- merge(temp, ind.PCAPM, by = 'AnimalID')
+
+data4Niche.PM <- data4Niche.PM[!data4Niche.PM$cluster == "Cluster 1",] #Get rid of cluster as there's only one individual
+
+aggregate(data4Niche.PM[29:34], data4Niche.PM[28], mean)
+
+# Generate parameter draws
+nsamples <- 1e4
+system.time({
+ PM.par <- tapply(1:nrow(data4Niche.PM), data4Niche.PM$cluster,
+                    function(ii) niw.post(nsamples = nsamples, X = data4Niche.PM[ii,29:34], Psi = Psi))
+})
+
+
+# various parameter plots
+clrs <- c("#e41a1c",
+          "#377eb8",
+          "#4daf4a",
+          "#984ea3",
+          "#ff7f00") # colors for each cluster
+
+# Plot all mu 
+pdf("../figures/PostMu_PM.pdf")
+niche.par.plot(PM.par, col = clrs, plot.mu = TRUE, plot.Sigma = FALSE)
+legend("topleft", legend = names(PM.par), fill = clrs)
+dev.off()
+
+niche.par.plot(PM.par, col = clrs, plot.mu = TRUE, plot.Sigma = FALSE)
+legend("topleft", legend = names(PM.par), fill = clrs)
+
+# Plot all Sigma 
+pdf("../figures/PostSigma_PM.pdf")
+par(mar = c(1,1,1,1))
+niche.par.plot(PM.par, col = clrs, plot.mu = FALSE, plot.Sigma = TRUE)
+legend("topleft", legend = names(PM.par), fill = clrs)
+dev.off()
+
+par(mar = c(1,1,1,1))
+niche.par.plot(PM.par, col = clrs, plot.mu = FALSE, plot.Sigma = TRUE)
+legend("topleft", legend = names(PM.par), fill = clrs)
+
+# 2-d projections of 50 niche regions
+nsamples <- 50
+PM.par <- tapply(1:nrow(data4Niche.PM), data4Niche.PM$cluster,
+                  function(ii) niw.post(nsamples = nsamples, X = data4Niche.PM[ii,29:34], Psi = Psi))
+
+# format data for plotting function
+PM.data <- tapply(1:nrow(data4Niche.PM), data4Niche.PM$cluster, function(ii) X = data4Niche.PM[ii,29:34])
+
+pdf("../figures/NicheRegionsPM.pdf")
+niche.plot(niche.par = PM.par, niche.data = PM.data, pfrac = .05,
+          iso.names = c('PCA1','PCA2','PCA3','PCA4','PCA5','PCA6'),
+            col = clrs, xlab = expression("PCA Scores"))
+dev.off()
+
+niche.plot(niche.par = PM.par, niche.data = PM.data, pfrac = .05,
+          iso.names = c('PCA1','PCA2','PCA3','PCA4','PCA5','PCA6'),
+            col = clrs, xlab = expression("PCA Scores"))
+#########################
+
+# niche overlap plots for 95% niche region sizes
+nsamples <- 10000
+PM.par <- tapply(1:nrow(data4Niche.PM), data4Niche.PM$cluster,
+                  function(ii) niw.post(nsamples = nsamples, X = data4Niche.PM[ii,29:34], Psi = Psi))
+
+# Overlap calculation.  use nsamples = nprob = 10000 (1e4) for higher accuracy.
+# the variable over.stat can be supplied directly to the overlap.plot function
+
+over.stat.PM <- overlap(PM.par, nreps = nsamples, nprob = 1e4, alpha = c(0.95, 0.99))
+
+#The mean overlap metrics calculated across iterations for both niche 
+#region sizes (alpha = .95 and alpha = .99) can be calculated and displayed in an array.
+over.mean.PM <- apply(over.stat.PM, c(1:2,4), mean)*100
+round(over.mean.PM, 2)
+
+# Credibility Intervals
+over.cred.PM <- apply(over.stat.PM*100, c(1:2, 4), quantile, prob = c(.025, .975), na.rm = TRUE)
+round(over.cred.PM[,,,1]) # display alpha = .95 niche region
+
+# Overlap plot
+#clrs <- c("#1b9e77", "#d95f02", "#7570b3") # colors for each cluster
+over.stat.PM <- overlap(PM.par, nreps = nsamples, nprob = 1e4, alpha = .95)
+pdf("../figures/NicheOverlapPM.pdf")
+overlap.plot(over.stat.PM, col = clrs, mean.cred.col = "turquoise", equal.axis = TRUE,
+            xlab = "Overlap Probability (%) -- Niche Region Size: 95%")
+dev.off()
+
+overlap.plot(over.stat.PM, col = clrs, mean.cred.col = "turquoise", equal.axis = TRUE,
+            xlab = "Overlap Probability (%) -- Niche Region Size: 95%")
+
+################################################################################
+###############################   Niche Size   #################################
+
+# posterior distribution of (mu, Sigma) for each strategy
+nsamples <- 10000
+PM.par <- tapply(1:nrow(data4Niche.PM), data4Niche.PM$cluster,
+                  function(ii) niw.post(nsamples = nsamples, X = data4Niche.PM[ii,29:34], Psi = Psi))
+
+# posterior distribution of niche size by species using the 75% contour to define strategy niche
+PM.size <- sapply(PM.par, function(spec) {
+  apply(spec$Sigma, 3, niche.size, alpha = .75)
+})
+
+# point estimate and standard error
+rbind(est = colMeans(PM.size),
+      se = apply(PM.size, 2, sd))
+
+# Niche Size
+PM.size2 <- matrix(NA, nrow = 40000, ncol = 2)
+colnames(PM.size2) <- c("Niche_Size", "Cluster")
+PM.size2[1:10000,1] <- PM.size[,1]
+PM.size2[1:10000,2] <- 'SubCluster 2'
+PM.size2[10001:20000,1] <- PM.size[,2]
+PM.size2[10001:20000,2] <- 'SubCluster 3'
+PM.size2[20001:30000,1] <- PM.size[,3]
+PM.size2[20001:30000,2] <- 'SubCluster 4'
+PM.size2[30001:40000,1] <- PM.size[,4]
+PM.size2[30001:40000,2] <- 'SubCluster 5'
+PM.size2 <- as.data.frame(PM.size2)
+PM.size2$Niche_Size <- as.numeric(PM.size2$Niche_Size)
+
+# Bhattacharyya coefficient to see how different the niche sizes are
+# Create an empty matrix
+
+Olap.PM <- matrix(NA,4,4)
+colnames(Olap.PM) <- c('SubCluster 2',
+                        'SubCluster 3',
+                        'SubCluster 4',
+                       'SubCluster 5')
+
+rownames(Olap.PM) <- c('SubCluster 2',
+                        'SubCluster 3',
+                        'SubCluster 4',
+                       'SubCluster 5')
+
+for (sc in 1:4){
+  for (sc2 in 1:4){
+    Olap.PM[sc,sc2] <-  bhatt.coeff(PM.size[,sc], PM.size[,sc2])
+  }
+  
+}
+
+
+
+median(PM.size[,1])
+range(PM.size[,1])
+
+median(PM.size[,2])
+range(PM.size[,2])
+
+median(PM.size[,3])
+range(PM.size[,3])
+
+median(PM.size[,4])
+range(PM.size[,4])
+
+plt.niche <- ggbetweenstats(
+  data = PM.size2,
+  x = Cluster,
+  y = Niche_Size,
+  type = "rb",
+  box.args = list(width = 0),
+  point.args = list(alpha = 0),
+  xlab = "Clusters PM",
+  ylab = "Niche Size"
+  )
+print(plt.niche)
+ggsave(filename = "../figures/NicheStrategies_PM.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+
+
+
+
+# Summary table
+sum.PM <- summary_table(f.PCAdata.PM, our_summary1)
+sum.PM
+
+saveRDS(f.PCAdata.PM, file = '../data/f.PCAdata.PM.rds')
+```
