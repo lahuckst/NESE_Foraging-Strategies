@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Load libraries and files with the cluster classification
 
-```{r}
+```{r setting-up}
 library(track2KBA) # load package
 library(dplyr)
 #library(tictoc)
@@ -30,7 +30,7 @@ transform_longitude_vector <- function(lons) {
 ```
 Run KBA for all PB females identified without considering the seasons
 
-```{r}
+```{r match-the-clusters}
 PBFemales <- read_csv("../results/PB_Clusters.csv")
 col2keep <- c('TOPPID','clusterAll')
 PBFemales <- PBFemales[,col2keep]
@@ -51,7 +51,7 @@ data <- data %>% semi_join(PBFemales, by = 'TOPPID')
 ```
 
 First step of the analysis
-```{r}
+```{r run-the-home-range-analyses}
 ### FIRST STEP, RUN THE ANALYSIS FOR THE WHOLE POPULATION
 # Prepare the data for analysis
 NESE.data <- formatFields(
@@ -97,7 +97,7 @@ NESE.sumTrips
 
 Kernel analysis
 
-```{r}
+```{r kernel-analysis}
 #NESE.trips$Longitude <- transform_longitude_vector(NESE.trips$Longitude)
 NESE.tracks <- projectTracks(dataGroup = NESE.trips, projType = 'azim', custom=TRUE )
 
@@ -131,7 +131,7 @@ ggsave(filename = "../figures/kdeUB_PB.pdf",
 st_write(NESE.KDE$UDPolygons, "../results/NESEUD50_PB_href.shp",append=FALSE)
 ```
 UD analysis
-```{r}
+```{r UD-analysis}
 
 
 #tic()
@@ -188,7 +188,7 @@ writeRaster(t2kba.2,'../results/t2kba2_PB.tif',overwrite=TRUE)
 
 
 Create the maps
-```{r}
+```{r create-the-maps}
 library(stars)
 library(sf)
 library(ggplot2)
@@ -253,7 +253,7 @@ nese_plot <- ggplot() +
   theme(panel.background = element_rect(fill = "skyblue3",
                                 colour = "skyblue3"),
         panel.grid.major = element_blank()) +
-         annotation_scale(location = "bl", width_hint = 0.3) +
+         #annotation_scale(location = "bl", width_hint = 0.3) +
   
   geom_sf(data = graticules.p, colour = "grey95", alpha = 0.7, linewidth = 0.3, linetype = "dashed")
   
