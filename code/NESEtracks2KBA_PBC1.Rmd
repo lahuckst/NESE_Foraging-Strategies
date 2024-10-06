@@ -1,7 +1,7 @@
 ---
 title: "NESEtracks2KBA_PBC1"
 author: "Luis Huckstadt"
-date: "2024-08-07"
+date: "2024-10-06"
 output: html_document
 ---
 
@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Load libraries and files with the cluster classification
 
-```{r}
+```{r setting-up}
 library(track2KBA) # load package
 library(dplyr)
 #library(tictoc)
@@ -28,12 +28,12 @@ transform_longitude_vector <- function(lons) {
 }
 
 ```
-Run KBA for all PB females identified without considering the seasons
+Run KBA for all PB Cluster 1 females identified without considering the seasons
 
-```{r}
-PBC1 <- read_csv("../results/PB_Cluster1.csv")
-col2keep <- c('TOPPID','clusterAll')
-PBC1 <- PBC1[,col2keep]
+```{r match-the-clusters}
+PBC1Females <- read_csv("../results/PB_Cluster1.csv")
+col2keep <- c('TOPPID','IntCluster')
+PBC1Females <- PBC1Females[,col2keep]
 
 # Load the tracking data
 data <- read.csv("../data/NESETracks6h.csv")
@@ -45,13 +45,13 @@ data <- data[,c2]
 colnames(data) <- c("FieldID","TOPPID","JulDate","longitude","latitude","Season","date_gmt", "time_gmt" )
 
 # Match the clusters to the tracks
-data <- data %>% semi_join(PBC1, by = 'TOPPID')
+data <- data %>% semi_join(PBC1Females, by = 'TOPPID')
   
 
 ```
 
 First step of the analysis
-```{r}
+```{r run-the-home-range-analyses}
 ### FIRST STEP, RUN THE ANALYSIS FOR THE WHOLE POPULATION
 # Prepare the data for analysis
 NESE.data <- formatFields(
@@ -82,7 +82,7 @@ NESE.trips <- tripSplit(
 )
 
 # Creates the maps with the trips
-pdf("../maps/NESEt2kba_Trips_PB.pdf")
+pdf("../maps/NESEt2kba_Trips_PBC1.pdf")
 mapTrips(trips = NESE.trips, colony = colony)
 dev.off()
 
@@ -97,7 +97,7 @@ NESE.sumTrips
 
 Kernel analysis
 
-```{r}
+```{r kernel-analysis}
 #NESE.trips$Longitude <- transform_longitude_vector(NESE.trips$Longitude)
 NESE.tracks <- projectTracks(dataGroup = NESE.trips, projType = 'azim', custom=TRUE )
 
@@ -120,12 +120,19 @@ NESE.KDE <- estSpaceUse(
   polyOut = TRUE 
   )
 
-mapKDE(KDE = NESE.KDE$UDPolygons, colony = colony)
-```
-UD analysis
-```{r}
+kde.fig <- mapKDE(KDE = NESE.KDE$UDPolygons, colony = colony)
+print(kde.fig)
+ggsave(filename = "../figures/kdeUB_PBC1.pdf",
+       plot = kde.fig,
+       device = cairo_pdf)
+
+
 # Save the individuals UDs
 st_write(NESE.KDE$UDPolygons, "../results/NESEUD50_PBC1_href.shp",append=FALSE)
+```
+UD analysis
+```{r UD-analysis}
+
 
 #tic()
 NESE.repr <- repAssess(
@@ -155,11 +162,11 @@ NESE.Site.2 <- findSite(
 
 # Potential Site
 
-potSite <- NESE.Site.1 %>% dplyr::filter(.data$potentialSite==TRUE) %>% 
-  summarise(
-    max_animals = max(na.omit(N_animals)), # maximum number of animals aggregating in the site
-    min_animals = min(na.omit(N_animals))  # minimum number using the site
-  )
+#potSite <- NESE.Site.1 %>% dplyr::filter(.data$potentialSite==TRUE) %>% 
+#  summarise(
+#    max_animals = max(na.omit(N_animals)), # maximum number of animals aggregating in the site
+#    min_animals = min(na.omit(N_animals))  # minimum number using the site
+#  )
 
 
 mapSite(NESE.Site.2, colony = colony)
@@ -173,7 +180,7 @@ t2kba.2[t2kba.2 == 0] <- NA
 #Save the data frame
 saveRDS(NESE.Site.2,'../results/NESEt2kba_PBC1.rds')
 writeRaster(t2kba.1,'../results/t2kba1_PBC1.tif',overwrite=TRUE)
-writeRaster(t2kba.2,'../results/t2kba2_PBC1.tif')
+writeRaster(t2kba.2,'../results/t2kba2_PBC1.tif',overwrite=TRUE)
 
 
 
@@ -181,7 +188,7 @@ writeRaster(t2kba.2,'../results/t2kba2_PBC1.tif')
 
 
 Create the maps
-```{r}
+```{r create-the-maps}
 library(stars)
 library(sf)
 library(ggplot2)
@@ -246,13 +253,13 @@ nese_plot <- ggplot() +
   theme(panel.background = element_rect(fill = "skyblue3",
                                 colour = "skyblue3"),
         panel.grid.major = element_blank()) +
-         annotation_scale(location = "bl", width_hint = 0.3) +
+         #annotation_scale(location = "bl", width_hint = 0.3) +
   
   geom_sf(data = graticules.p, colour = "grey95", alpha = 0.7, linewidth = 0.3, linetype = "dashed")
   
+print(nese_plot)
 
-
-ggsave(filename = "../figures/KBA_PBC1.pdf",
+ggsave(filename = "../figures/KBA_PBC1Females.pdf",
        plot = nese_plot,
        device = cairo_pdf)
 
