@@ -1,5 +1,5 @@
 ---
-title: "NESEtracks2KBA_PBC1"
+title: "NESEtracks2KBA_PBC2"
 author: "Luis Huckstadt"
 date: "2024-10-06"
 output: html_document
@@ -28,12 +28,12 @@ transform_longitude_vector <- function(lons) {
 }
 
 ```
-Run KBA for all PB Cluster 1 females identified without considering the seasons
+Run KBA for all PB Cluster 2 females identified without considering the seasons
 
 ```{r match-the-clusters}
-PBC1Females <- read_csv("../results/PB_Cluster1.csv")
+PBC2Females <- read_csv("../results/PB_Cluster2.csv")
 col2keep <- c('TOPPID','IntCluster')
-PBC1Females <- PBC1Females[,col2keep]
+PBC2Females <- PBC2Females[,col2keep]
 
 # Load the tracking data
 data <- read.csv("../data/NESETracks6h.csv")
@@ -45,7 +45,7 @@ data <- data[,c2]
 colnames(data) <- c("FieldID","TOPPID","JulDate","longitude","latitude","Season","date_gmt", "time_gmt" )
 
 # Match the clusters to the tracks
-data <- data %>% semi_join(PBC1Females, by = 'TOPPID')
+data <- data %>% semi_join(PBC2Females, by = 'TOPPID')
   
 
 ```
@@ -82,7 +82,7 @@ NESE.trips <- tripSplit(
 )
 
 # Creates the maps with the trips
-pdf("../maps/NESEt2kba_Trips_PBC1.pdf")
+pdf("../maps/NESEt2kba_Trips_PBC2.pdf")
 mapTrips(trips = NESE.trips, colony = colony)
 dev.off()
 
@@ -122,13 +122,13 @@ NESE.KDE <- estSpaceUse(
 
 kde.fig <- mapKDE(KDE = NESE.KDE$UDPolygons, colony = colony)
 print(kde.fig)
-ggsave(filename = "../figures/kdeUB_PBC1.pdf",
+ggsave(filename = "../figures/kdeUB_PBC2.pdf",
        plot = kde.fig,
        device = cairo_pdf)
 
 
 # Save the individuals UDs
-st_write(NESE.KDE$UDPolygons, "../results/NESEUD50_PBC1_href.shp",append=FALSE)
+st_write(NESE.KDE$UDPolygons, "../results/NESEUD50_PBC2_href.shp",append=FALSE)
 ```
 UD analysis
 ```{r UD-analysis}
@@ -178,9 +178,9 @@ t2kba.2 <- raster(NESE.Site.2, layer = 2, values = TRUE)
 t2kba.2[t2kba.2 == 0] <- NA
 
 #Save the data frame
-saveRDS(NESE.Site.2,'../results/NESEt2kba_PBC1.rds')
-writeRaster(t2kba.1,'../results/t2kba1_PBC1.tif',overwrite=TRUE)
-writeRaster(t2kba.2,'../results/t2kba2_PBC1.tif',overwrite=TRUE)
+saveRDS(NESE.Site.2,'../results/NESEt2kba_PBC2.rds')
+writeRaster(t2kba.1,'../results/t2kba1_PBC2.tif',overwrite=TRUE)
+writeRaster(t2kba.2,'../results/t2kba2_PBC2.tif',overwrite=TRUE)
 
 
 
@@ -195,7 +195,7 @@ library(ggplot2)
 
 
 #Load the raster created originally
-t2kba.i <- read_stars('../results/t2kba1_PBC1.tif')
+t2kba.i <- read_stars('../results/t2kba1_PBC2.tif')
 t2kba.i[t2kba.i==0] <- NA
 
 # Read the coastline
@@ -259,7 +259,7 @@ nese_plot <- ggplot() +
   
 print(nese_plot)
 
-ggsave(filename = "../figures/KBA_PBC1Females.pdf",
+ggsave(filename = "../figures/KBA_PBC2Females.pdf",
        plot = nese_plot,
        device = cairo_pdf)
 
