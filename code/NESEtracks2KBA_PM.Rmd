@@ -189,7 +189,7 @@ library(ggplot2)
 
 
 #Load the raster created originally
-t2kba.i <- read_stars('../results/t2kba1_All.tif')
+t2kba.i <- read_stars('../results/t2kba1_PM.tif')
 t2kba.i[t2kba.i==0] <- NA
 
 # Read the coastline
@@ -247,14 +247,13 @@ nese_plot <- ggplot() +
   theme(panel.background = element_rect(fill = "skyblue3",
                                 colour = "skyblue3"),
         panel.grid.major = element_blank()) +
-         annotation_scale(location = "bl", width_hint = 0.3) +
+         #annotation_scale(location = "bl", width_hint = 0.3) +
   
   geom_sf(data = graticules.p, colour = "grey95", alpha = 0.7, linewidth = 0.3, linetype = "dashed")
   
+print(nese_plot)
 
-nese_plot
-
-ggsave(filename = "../figures/KBA_AllFemales.pdf",
+ggsave(filename = "../figures/KBA_PMFemales.pdf",
        plot = nese_plot,
        device = cairo_pdf)
 
