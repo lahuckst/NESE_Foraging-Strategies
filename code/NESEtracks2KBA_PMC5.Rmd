@@ -192,10 +192,7 @@ Create the maps
 library(stars)
 library(sf)
 library(ggplot2)
-<<<<<<< HEAD
 library(rgdal)
-=======
->>>>>>> cc2db67373d7b6ea39b0142593fde2209160defc
 
 
 #Load the raster created originally
@@ -209,17 +206,14 @@ coastline <- st_read('../data/GSHHS_shp/f/GSHHS_f_L1.shp')
 coastline.p <- st_transform(coastline, st_crs(t2kba.i))
 rstr.ext <- st_coordinates(t2kba.i)
 
-<<<<<<< HEAD
-disp_win_wgs84 <- st_sfc(st_point(c(170, 30)), st_point(c(-120, 70)),
+
+disp_win_wgs84 <- st_sfc(st_point(c(170, 30)), st_point(c(270,50)),
                          crs = 4326)
 disp_win_trans <- st_transform(disp_win_wgs84, crs = crs(t2kba.1))
 disp_win_coord <- st_coordinates(disp_win_trans)
 
 map_limits <- c(disp_win_coord[1],disp_win_coord[2],disp_win_coord[3],disp_win_coord[4]) # Set map limits for all figures
 
-=======
-map_limits <- c(-5702014.0,7534.8,-585362.4,3869809.3) # Set map limits for all figures
->>>>>>> cc2db67373d7b6ea39b0142593fde2209160defc
 
 # read the 200m isobath
 iso200 <- st_read('../data/Shelf/ETOPO2024_200m_NP.shp')
@@ -262,13 +256,8 @@ nese_plot <- ggplot() +
   geom_sf(data = iso200.p, color = "grey85", size = 0.4) + 
   geom_sf(data = colony.p, aes(geometry = geometry), 
           shape = 23, color = "black", fill = "darkorange3", size = 5) +
-<<<<<<< HEAD
-  lims(x = c(map_limits[1], map_limits[4]), y = c(map_limits[2], map_limits[3])) 
-
-+ 
-=======
-  lims(x = c(map_limits[1], map_limits[2]), y = c(map_limits[3], map_limits[4])) + 
->>>>>>> cc2db67373d7b6ea39b0142593fde2209160defc
+  xlim(disp_win_coord[1,1],disp_win_coord[2,1]) +
+  ylim(disp_win_coord[1,2],disp_win_coord[2,2]) +
   labs(x = 'Longitude (°)', y = 'Latitude (°)') +
   theme(panel.background = element_rect(fill = "skyblue3",
                                 colour = "skyblue3"),
