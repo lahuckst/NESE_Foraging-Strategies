@@ -192,7 +192,6 @@ Create the maps
 library(stars)
 library(sf)
 library(ggplot2)
-library(rgdal)
 
 
 #Load the raster created originally
