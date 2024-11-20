@@ -267,7 +267,7 @@ nese_plot <- ggplot() +
   
 print(nese_plot)
 
-ggsave(filename = "../figures/KBA_PMC5Females.pdf",
+ggsave(filename = "../maps/KBA_PMC5Females.pdf",
        plot = nese_plot,
        device = cairo_pdf)
 
