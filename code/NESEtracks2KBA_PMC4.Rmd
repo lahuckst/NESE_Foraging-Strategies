@@ -193,12 +193,6 @@ library(stars)
 library(sf)
 library(ggplot2)
 
-
-library(stars)
-library(sf)
-library(ggplot2)
-
-
 #Load the raster created originally
 t2kba.i <- read_stars('../results/t2kba1_PMC4.tif')
 t2kba.i[t2kba.i==0] <- NA
@@ -272,7 +266,7 @@ nese_plot <- ggplot() +
   
 print(nese_plot)
 
-ggsave(filename = "../maps/KBA_PMC5Females.pdf",
+ggsave(filename = "../maps/KBA_PMC4Females.pdf",
        plot = nese_plot,
        device = cairo_pdf)
 
