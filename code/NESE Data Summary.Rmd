@@ -1,0 +1,706 @@
+---
+title: "NESE-Foraging Summary and Tables"
+author: "Luis Huckstadt"
+date: "2024-11-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load the libraries
+```{r}
+
+library(tidyverse)
+library(ggplot2)
+library(psych)
+
+```
+
+Describe the data for all females
+
+```{r}
+NESEdata <- read.csv('../results/All_Clusters.csv')
+
+Sum.All <- describe(NESEdata[,c("d13C","d15N","MaxLat_degrees","MinLon_degrees",
+                                "MedianDistToContShelf_km",
+                                "SdDistContShelf_km","MesoEcoProportionShelf","MesoEcoProportionCAC",
+                      "MesoEcoProportionSubArcticPac","MesoEcoProportionNorthCPac","Mean_Depth_m",
+                      "Mean_Depth_sd","Mean_Duration_sec","Mean_Duration_sd","Pct_TransitDives",
+                      "Pct_ForagingDives","Pct_DriftDives","Pct_BenthicDives","PctTripDiving",
+                      "DeepDayForageDivesMedian_m","DeepNightForageDivesMedian_m")],fast = TRUE)
+
+Sum.Trips <- describeBy(NESEdata[,c("d13C","d15N","MaxLat_degrees","MinLon_degrees",
+                                "MedianDistToContShelf_km",
+                                "SdDistContShelf_km","MesoEcoProportionShelf","MesoEcoProportionCAC",
+                      "MesoEcoProportionSubArcticPac","MesoEcoProportionNorthCPac","Mean_Depth_m",
+                      "Mean_Depth_sd","Mean_Duration_sec","Mean_Duration_sd","Pct_TransitDives",
+                      "Pct_ForagingDives","Pct_DriftDives","Pct_BenthicDives","PctTripDiving",
+                      "DeepDayForageDivesMedian_m","DeepNightForageDivesMedian_m")],
+                      group = NESEdata$Trip,
+                      fast = TRUE)
+
+
+```
+
+Get the summary for the PB clusters
+
+```{r}
+NESEdata <- read.csv('../results/PB_Cluster1.csv')
+
+Sum.PBC1 <- describe(NESEdata[,c("d13C","d15N","MaxLat_degrees","MinLon_degrees",
+                                "MedianDistToContShelf_km",
+                                "SdDistContShelf_km","MesoEcoProportionShelf","MesoEcoProportionCAC",
+                      "MesoEcoProportionSubArcticPac","MesoEcoProportionNorthCPac","Mean_Depth_m",
+                      "Mean_Depth_sd","Mean_Duration_sec","Mean_Duration_sd","Pct_TransitDives",
+                      "Pct_ForagingDives","Pct_DriftDives","Pct_BenthicDives","PctTripDiving",
+                      "DeepDayForageDivesMedian_m","DeepNightForageDivesMedian_m")],fast = TRUE)
+
+NESEdata <- read.csv('../results/PB_Cluster2.csv')
+
+Sum.PBC2 <- describe(NESEdata[,c("d13C","d15N","MaxLat_degrees","MinLon_degrees",
+                                "MedianDistToContShelf_km",
+                                "SdDistContShelf_km","MesoEcoProportionShelf","MesoEcoProportionCAC",
+                      "MesoEcoProportionSubArcticPac","MesoEcoProportionNorthCPac","Mean_Depth_m",
+                      "Mean_Depth_sd","Mean_Duration_sec","Mean_Duration_sd","Pct_TransitDives",
+                      "Pct_ForagingDives","Pct_DriftDives","Pct_BenthicDives","PctTripDiving",
+                      "DeepDayForageDivesMedian_m","DeepNightForageDivesMedian_m")],fast = TRUE)
+
+NESEdata <- read.csv('../results/PB_Cluster3.csv')
+
+Sum.PBC3 <- describe(NESEdata[,c("d13C","d15N","MaxLat_degrees","MinLon_degrees",
+                                "MedianDistToContShelf_km",
+                                "SdDistContShelf_km","MesoEcoProportionShelf","MesoEcoProportionCAC",
+                      "MesoEcoProportionSubArcticPac","Mean_Depth_m",
+                      "Mean_Depth_sd","Mean_Duration_sec","Mean_Duration_sd","Pct_TransitDives",
+                      "Pct_ForagingDives","Pct_DriftDives","Pct_BenthicDives","PctTripDiving",
+                      "DeepDayForageDivesMedian_m","DeepNightForageDivesMedian_m")],fast = TRUE)
+
+
+```
+
+Get the summary for the PM clusters
+
+```{r}
+
+NESEdata <- read.csv('../results/PM_Clusters.csv')
+
+
+Sum.PM <- describeBy(NESEdata[,c("d13C","d15N","MaxLat_degrees","MinLon_degrees",
+                                "MedianDistToContShelf_km",
+                                "SdDistContShelf_km","MesoEcoProportionShelf","MesoEcoProportionCAC",
+                      "MesoEcoProportionSubArcticPac","MesoEcoProportionNorthCPac","Mean_Depth_m",
+                      "Mean_Depth_sd","Mean_Duration_sec","Mean_Duration_sd","Pct_TransitDives",
+                      "Pct_ForagingDives","Pct_DriftDives","Pct_BenthicDives","PctTripDiving",
+                      "DeepDayForageDivesMedian_m","DeepNightForageDivesMedian_m")],
+                      group = NESEdata$cluster,
+                      fast = TRUE)
+
+
+
+```
+Test for differences in the variables across the differences gorupings
+
+```{r}
+library(tidyverse)
+library(ggpubr)
+library(rstatix)
+
+# Between PB and PM
+NESEdata <- read.csv('../results/All_Clusters.csv')
+NESEdata$fTrip <- as.factor(NESEdata$Trip)
+levels(NESEdata$fTrip)
+
+# d13C
+ggboxplot(NESEdata, x = "fTrip", y = "d13C")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(d13C)
+
+
+# Check for normality assumption
+
+# Build the linear model
+model  <- lm(d13C ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "d13C", facet.by = "fTrip")
+
+# Use a K-W test
+d13C.kw <- NESEdata %>% kruskal_test(d13C ~ fTrip)
+d13C.kw
+
+# d15N
+ggboxplot(NESEdata, x = "fTrip", y = "d15N")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(d15N)
+
+
+# Check for normality assumption
+
+# Build the linear model
+model  <- lm(d15N ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "d15N", facet.by = "fTrip")
+
+# Use a K-W test
+d15N.kw <- NESEdata %>% kruskal_test(d15N ~ fTrip)
+d15N.kw
+
+
+```
+
+Habitat utilisation PB/PM
+
+```{r}
+# MaxLat_degrees
+ggboxplot(NESEdata, x = "fTrip", y = "MaxLat_degrees")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(MaxLat_degrees)
+
+
+# Check for normality assumption
+
+# Build the linear model
+model  <- lm(MaxLat_degrees ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "MaxLat_degrees", facet.by = "fTrip")
+
+# Use a K-W test
+MaxLat_degrees.kw <- NESEdata %>% kruskal_test(MaxLat_degrees ~ fTrip)
+MaxLat_degrees.kw
+
+# MinLon_degrees
+ggboxplot(NESEdata, x = "fTrip", y = "MinLon_degrees")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(MinLon_degrees)
+
+
+# Check for normality assumption
+
+# Build the linear model
+model  <- lm(MinLon_degrees ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "MinLon_degrees", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+MinLon_degrees.aov <- NESEdata %>% anova_test(MinLon_degrees ~ fTrip)
+MinLon_degrees.aov
+
+# MedianDistToContShelf_km
+ggboxplot(NESEdata, x = "fTrip", y = "MedianDistToContShelf_km")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(MedianDistToContShelf_km)
+
+
+# Check for normality assumption
+
+# Build the linear model
+model  <- lm(MedianDistToContShelf_km ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "MedianDistToContShelf_km", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+MedianDistToContShelf_km.kw <- NESEdata %>% kruskal_test(MedianDistToContShelf_km ~ fTrip)
+MedianDistToContShelf_km.kw
+
+# SdDistContShelf_km
+ggboxplot(NESEdata, x = "fTrip", y = "SdDistContShelf_km")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(SdDistContShelf_km)
+
+
+# Check for normality assumption
+
+# Build the linear model
+model  <- lm(SdDistContShelf_km ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "SdDistContShelf_km", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+SdDistContShelf_km.kw <- NESEdata %>% kruskal_test(SdDistContShelf_km ~ fTrip)
+SdDistContShelf_km.kw
+
+# MesoEcoProportionShelf
+ggboxplot(NESEdata, x = "fTrip", y = "MesoEcoProportionShelf")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(MesoEcoProportionShelf)
+
+
+# Check for normality assumption
+
+# Build the linear model
+model  <- lm(MesoEcoProportionShelf ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "MesoEcoProportionShelf", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+MesoEcoProportionShelf.kw <- NESEdata %>% kruskal_test(MesoEcoProportionShelf ~ fTrip)
+MesoEcoProportionShelf.kw
+
+
+#MesoEcoProportionCAC
+ggboxplot(NESEdata, x = "fTrip", y = "MesoEcoProportionCAC")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(MesoEcoProportionCAC)
+
+
+# Check for normality assumption
+# Build the linear model
+model  <- lm(MesoEcoProportionCAC ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "MesoEcoProportionCAC", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+MesoEcoProportionCAC.kw <- NESEdata %>% kruskal_test(MesoEcoProportionCAC ~ fTrip)
+MesoEcoProportionCAC.kw
+
+#MesoEcoProportionSubArcticPac
+ggboxplot(NESEdata, x = "fTrip", y = "MesoEcoProportionSubArcticPac")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(MesoEcoProportionSubArcticPac)
+
+
+# Check for normality assumption
+# Build the linear model
+model  <- lm(MesoEcoProportionSubArcticPac ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "MesoEcoProportionSubArcticPac", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+MesoEcoProportionSubArcticPac.kw <- NESEdata %>% kruskal_test(MesoEcoProportionSubArcticPac ~ fTrip)
+MesoEcoProportionSubArcticPac.kw
+
+# MesoEcoProportionNorthCPac
+ggboxplot(NESEdata, x = "fTrip", y = "MesoEcoProportionNorthCPac")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(MesoEcoProportionNorthCPac)
+
+
+# Check for normality assumption
+# Build the linear model
+model  <- lm(MesoEcoProportionNorthCPac ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "MesoEcoProportionNorthCPac", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+MesoEcoProportionNorthCPac.kw <- NESEdata %>% kruskal_test(MesoEcoProportionNorthCPac ~ fTrip)
+MesoEcoProportionNorthCPac.kw
+```
+Diving parameters PB/PM
+
+```{r}
+
+## Mean_Depth_m
+ggboxplot(NESEdata, x = "fTrip", y = "Mean_Depth_m")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(Mean_Depth_m)
+
+
+# Check for normality assumption
+# Build the linear model
+model  <- lm(Mean_Depth_m ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "Mean_Depth_m", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+Mean_Depth_m.kw <- NESEdata %>% kruskal_test(Mean_Depth_m ~ fTrip)
+Mean_Depth_m.kw
+
+## Mean_Depth_sd
+ggboxplot(NESEdata, x = "fTrip", y = "Mean_Depth_sd")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(Mean_Depth_sd)
+
+
+# Check for normality assumption
+# Build the linear model
+model  <- lm(Mean_Depth_sd ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "Mean_Depth_sd", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+Mean_Depth_sd.kw <- NESEdata %>% kruskal_test(Mean_Depth_sd ~ fTrip)
+Mean_Depth_sd.kw
+
+## Mean_Duration_sec
+ggboxplot(NESEdata, x = "fTrip", y = "Mean_Duration_sec")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(Mean_Duration_sec)
+
+
+# Check for normality assumption
+# Build the linear model
+model  <- lm(Mean_Duration_sec ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "Mean_Duration_sec", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+Mean_Duration_sec.kw <- NESEdata %>% kruskal_test(Mean_Duration_sec ~ fTrip)
+Mean_Duration_sec.kw
+
+## Mean_Duration_sd
+ggboxplot(NESEdata, x = "fTrip", y = "Mean_Duration_sd")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(Mean_Duration_sd)
+
+
+# Check for normality assumption
+# Build the linear model
+model  <- lm(Mean_Duration_sd ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "Mean_Duration_sd", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+Mean_Duration_sd.kw <- NESEdata %>% kruskal_test(Mean_Duration_sd ~ fTrip)
+Mean_Duration_sd.kw
+
+## DeepDayForageDivesMedian_m
+ggboxplot(NESEdata, x = "fTrip", y = "DeepDayForageDivesMedian_m")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(DeepDayForageDivesMedian_m)
+
+
+# Check for normality assumption
+# Build the linear model
+model  <- lm(DeepDayForageDivesMedian_m ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "DeepDayForageDivesMedian_m", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+DeepDayForageDivesMedian_m.kw <- NESEdata %>% kruskal_test(DeepDayForageDivesMedian_m ~ fTrip)
+DeepDayForageDivesMedian_m.kw
+
+## DeepNightForageDivesMedian_m
+ggboxplot(NESEdata, x = "fTrip", y = "DeepNightForageDivesMedian_m")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(DeepNightForageDivesMedian_m)
+
+
+# Check for normality assumption
+# Build the linear model
+model  <- lm(DeepNightForageDivesMedian_m ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "DeepNightForageDivesMedian_m", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+DeepNightForageDivesMedian_m.kw <- NESEdata %>% kruskal_test(DeepNightForageDivesMedian_m ~ fTrip)
+DeepNightForageDivesMedian_m.kw
+
+## Pct_TransitDives
+ggboxplot(NESEdata, x = "fTrip", y = "Pct_TransitDives")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(Pct_TransitDives)
+
+
+# Check for normality assumption
+# Build the linear model
+model  <- lm(Pct_TransitDives ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "Pct_TransitDives", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+Pct_TransitDives.aov <- NESEdata %>% anova_test(Pct_TransitDives ~ fTrip)
+Pct_TransitDives.aov
+
+## Pct_ForagingDives
+ggboxplot(NESEdata, x = "fTrip", y = "Pct_ForagingDives")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(Pct_ForagingDives)
+
+
+# Check for normality assumption
+# Build the linear model
+model  <- lm(Pct_ForagingDives ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "Pct_ForagingDives", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+Pct_TransitDives.kw <- NESEdata %>% kruskal_test(Pct_ForagingDives ~ fTrip)
+Pct_TransitDives.kw
+
+## Pct_DriftDives
+ggboxplot(NESEdata, x = "fTrip", y = "Pct_DriftDives")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(Pct_DriftDives)
+
+
+# Check for normality assumption
+# Build the linear model
+model  <- lm(Pct_DriftDives ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "Pct_DriftDives", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+Pct_DriftDives.kw <- NESEdata %>% kruskal_test(Pct_DriftDives ~ fTrip)
+Pct_DriftDives.kw
+
+## Pct_BenthicDives
+ggboxplot(NESEdata, x = "fTrip", y = "Pct_BenthicDives")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(Pct_BenthicDives)
+
+
+# Check for normality assumption
+# Build the linear model
+model  <- lm(Pct_BenthicDives ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "Pct_BenthicDives", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+Pct_BenthicDives.kw <- NESEdata %>% kruskal_test(Pct_BenthicDives ~ fTrip)
+Pct_BenthicDives.kw
+
+## PctTripDiving
+ggboxplot(NESEdata, x = "fTrip", y = "PctTripDiving")
+
+NESEdata %>% 
+  group_by(fTrip) %>%
+  identify_outliers(PctTripDiving)
+
+
+# Check for normality assumption
+# Build the linear model
+model  <- lm(PctTripDiving ~ fTrip, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "PctTripDiving", facet.by = "fTrip")
+
+# Use an ANOVA K-W test
+PctTripDiving.kw <- NESEdata %>% kruskal_test(PctTripDiving ~ fTrip)
+PctTripDiving.kw
+
+```
+
+Differences in prameters for PB Clusters
+```{r}
+# Wihtin PB Clusters
+NESEdata <- read.csv('../results/PB_Clusters.csv')
+NESEdata$fCluster <- as.factor(NESEdata$cluster)
+levels(NESEdata$fCluster)
+
+# d13C
+ggboxplot(NESEdata, x = "fCluster", y = "d13C")
+
+NESEdata %>% 
+  group_by(fCluster) %>%
+  identify_outliers(d13C)
+
+
+# Check for normality assumption
+
+# Build the linear model
+model  <- lm(d13C ~ fCluster, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are  normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "d13C", facet.by = "fCluster")
+
+# Use an ANOVA test
+d13C.aov <- NESEdata %>% anova_test(d13C ~ fCluster)
+d13C.aov
+
+# Post-hoc
+d13C.pwc <- NESEdata %>% tukey_hsd(d13C ~ fCluster)
+d13C.pwc
+
+
+## d15N
+ggboxplot(NESEdata, x = "fCluster", y = "d15N")
+
+NESEdata %>% 
+  group_by(fCluster) %>%
+  identify_outliers(d15N)
+
+
+# Check for normality assumption
+
+# Build the linear model
+model  <- lm(d15N ~ fCluster, data = NESEdata)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+
+
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model)) # Data are not normally distributed, but because N > 50 it's better to use the qqplot to make a decision
+
+ggqqplot(NESEdata, "d15N", facet.by = "fCluster")
+
+# Use a K-W test
+d15N.kw <- NESEdata %>% kruskal_test(d15N ~ fCluster)
+d15N.kw
+
+# Posthoc Dunn's test
+d15N.pwc <- NESEdata %>% dunn_test(d15N ~ fCluster, p.adjust.method = 'bonferroni')
+d15N.pwc
+
+
+```
