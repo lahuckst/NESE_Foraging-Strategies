@@ -1,9 +1,6 @@
 ---
-<<<<<<< HEAD
+
 title: "NESE_HCPC_PBCluster1"
-=======
-title: "NESE_HCPC_PostBreeding_Cluster1"
->>>>>>> acc860cef25232e142cefadc3d33380729a0c1c2
 author: "Luis Huckstadt"
 date: "2024-07-16"
 output: html_document
@@ -12,10 +9,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-<<<<<<< HEAD
-=======
 
->>>>>>> acc860cef25232e142cefadc3d33380729a0c1c2
 Load all libraries
 ```{r}
 
@@ -69,8 +63,7 @@ our_summary1 <-
 
 # Import the data
 f.PCAdata.PB <- readRDS("../data/f.PCAdata.PB.rds")
-<<<<<<< HEAD
-=======
+
 
 ```
 
@@ -437,6 +430,8 @@ for (sc in 1:9){
   
 }
 
+Olap.PB1
+
 plt.niche <- ggbetweenstats(
   data = PB1.size2,
   x = SubCluster,
@@ -457,5 +452,5 @@ print(plt.niche)
 # Summary table
 sum.PB1 <- summary_table(f.PCAdata.PB.1, our_summary1)
 sum.PB1
->>>>>>> acc860cef25232e142cefadc3d33380729a0c1c2
+
 ```

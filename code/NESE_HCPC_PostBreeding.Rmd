@@ -366,13 +366,13 @@ range(PB.size[,3])
 # Create an empty matrix
 
 Olap.PB <- matrix(NA,3,3)
-colnames(Olap.PB) <- c('SubCluster 1',
-                        'SubCluster 2',
-                        'SubCluster 3')
+colnames(Olap.PB) <- c('Cluster 1',
+                        'Cluster 2',
+                        'Cluster 3')
 
-rownames(Olap.PB) <- c('SubCluster 1',
-                        'SubCluster 2',
-                        'SubCluster 3')
+rownames(Olap.PB) <- c('Cluster 1',
+                        'Cluster 2',
+                        'Cluster 3')
 
 for (sc in 1:3){
   for (sc2 in 1:3){
@@ -380,6 +380,9 @@ for (sc in 1:3){
   }
   
 }
+
+Olap.PB
+
 # Summary table
 sum.PB <- summary_table(f.PCAdata.PB, our_summary1)
 sum.PB

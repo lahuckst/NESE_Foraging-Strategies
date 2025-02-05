@@ -353,15 +353,15 @@ PM.size2$Niche_Size <- as.numeric(PM.size2$Niche_Size)
 # Create an empty matrix
 
 Olap.PM <- matrix(NA,4,4)
-colnames(Olap.PM) <- c('SubCluster 2',
-                        'SubCluster 3',
-                        'SubCluster 4',
-                       'SubCluster 5')
+colnames(Olap.PM) <- c('Cluster 2',
+                        'Cluster 3',
+                        'Cluster 4',
+                       'Cluster 5')
 
-rownames(Olap.PM) <- c('SubCluster 2',
-                        'SubCluster 3',
-                        'SubCluster 4',
-                       'SubCluster 5')
+rownames(Olap.PM) <- c('Cluster 2',
+                        'Cluster 3',
+                        'Cluster 4',
+                       'Cluster 5')
 
 for (sc in 1:4){
   for (sc2 in 1:4){
@@ -370,7 +370,7 @@ for (sc in 1:4){
   
 }
 
-
+Olap.PM
 
 median(PM.size[,1])
 range(PM.size[,1])
@@ -386,12 +386,12 @@ range(PM.size[,4])
 
 plt.niche <- ggbetweenstats(
   data = PM.size2,
-  x = Cluster,
+   x = Cluster,
   y = Niche_Size,
-  type = "rb",
-  box.args = list(width = 0),
-  point.args = list(alpha = 0),
-  xlab = "Clusters PM",
+  #type = "b",
+  #violin.args = list(width = 0),
+  #point.args = list(alpha = 0),
+  xlab = "Clusters Post-Breeding",
   ylab = "Niche Size"
   )
 print(plt.niche)
