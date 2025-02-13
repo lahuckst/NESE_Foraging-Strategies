@@ -386,9 +386,7 @@ plt.niche <- ggbetweenstats(
   data = PB2.size2,
   x = SubCluster,
   y = Niche_Size,
-  type = "rb",
-  box.args = list(width = 0),
-  point.args = list(alpha = 0),
+  pairwise.display = "none",
   xlab = "SubClusters PB2",
   ylab = "Niche Size"
   )
@@ -405,5 +403,130 @@ print(plt.niche)
 # Summary table
 sum.PB2 <- summary_table(f.PCAdata.PB.2, our_summary1)
 sum.PB2
+
+```
+
+```{r}
+
+#Load the substructure data
+data4boxplot <- read.csv('../results/PB_Cluster2.csv')
+
+#Substructure, Two main variables for the first 3 PCs
+#PC1
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = IntCluster,
+  y = Pct_ForagingDives,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "SubClusters PB2",
+  ylab = "Pct_ForagingDives") +
+  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+
+ggsave(filename = "../figures/PBC2_PercFor.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = IntCluster,
+  y = Mean_Depth_m,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "SubClusters PB2",
+  ylab = "Mean_Depth_m") +
+  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+
+ggsave(filename = "../figures/PBC2_MeanDepth.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#PC2
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = IntCluster,
+  y = MedianDistToContShelf_km,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "SubClusters PB2",
+  ylab = "MedianDistToContShelf_km") +
+  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+
+ggsave(filename = "../figures/PBC2_MedianDIst2Shelf.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = IntCluster,
+  y = SdDistContShelf_km,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "SubClusters PB2",
+  ylab = "SdDistContShelf_km") +
+  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+
+ggsave(filename = "../figures/PBC2_SdDist2Shelf.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#PC3
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = IntCluster,
+  y = Mean_Duration_sd,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "SubClusters PB2",
+  ylab = "Mean_Duration_sd") +
+  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+
+ggsave(filename = "../figures/PBC2_MeanDurationSD.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = IntCluster,
+  y = Mean_Duration_sec,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "SubClusters PB2",
+  ylab = "Mean_Duration_sec") +
+  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+
+ggsave(filename = "../figures/PBC2_MeanDuration.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
 
 ```
