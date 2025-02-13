@@ -437,9 +437,7 @@ plt.niche <- ggbetweenstats(
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
   xlab = "SubClusters PB1",
-  ylab = "Niche Size"
-  )
-+
+  ylab = "Niche Size") +
   ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
                                '#ff7f00','#ffff33','#a65628','#f781bf',
                                '#999999'))
@@ -473,8 +471,7 @@ plt.niche <- ggbetweenstats(
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
     xlab = "SubClusters PB1",
-  ylab = "MaxLat_degrees"
-  ) +
+  ylab = "MaxLat_degrees") +
   ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
                                '#ff7f00','#ffff33','#a65628','#f781bf',
                                '#999999'))
@@ -495,8 +492,7 @@ plt.niche <- ggbetweenstats(
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
     xlab = "SubClusters PB1",
-  ylab = "MesoEcoProportionNorthCPac"
-  ) +
+  ylab = "MesoEcoProportionNorthCPac") +
   ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
                                '#ff7f00','#ffff33','#a65628','#f781bf',
                                '#999999'))
@@ -518,8 +514,7 @@ plt.niche <- ggbetweenstats(
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
     xlab = "SubClusters PB1",
-  ylab = "MinLon_degrees"
-  ) +
+  ylab = "MinLon_degrees") +
   ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
                                '#ff7f00','#ffff33','#a65628','#f781bf',
                                '#999999'))
@@ -540,8 +535,7 @@ plt.niche <- ggbetweenstats(
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
     xlab = "SubClusters PB1",
-  ylab = "MesoEcoProportionCAC"
-  ) +
+  ylab = "MesoEcoProportionCAC") +
   ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
                                '#ff7f00','#ffff33','#a65628','#f781bf',
                                '#999999'))
@@ -563,8 +557,7 @@ plt.niche <- ggbetweenstats(
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
     xlab = "SubClusters PB1",
-  ylab = "DeepDayForageDivesMedian_m"
-  ) +
+  ylab = "DeepDayForageDivesMedian_m") +
   ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
                                '#ff7f00','#ffff33','#a65628','#f781bf',
                                '#999999'))
@@ -585,8 +578,7 @@ plt.niche <- ggbetweenstats(
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
     xlab = "SubClusters PB1",
-  ylab = "Mean_Depth_m"
-  ) +
+  ylab = "Mean_Depth_m") +
   ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
                                '#ff7f00','#ffff33','#a65628','#f781bf',
                                '#999999'))
