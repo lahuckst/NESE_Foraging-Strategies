@@ -361,7 +361,7 @@ for (sc in 1:2){
   
 }
 
-
+Olap.PM2
 
 median(PM2.size[,1])
 range(PM2.size[,1])
@@ -374,9 +374,10 @@ plt.niche <- ggbetweenstats(
   data = PM2.size2,
   x = SubCluster,
   y = Niche_Size,
-  type = "rb",
-  box.args = list(width = 0),
-  point.args = list(alpha = 0),
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
   xlab = "PMC2 SubClusters",
   ylab = "Niche Size"
   )
@@ -389,5 +390,130 @@ print(plt.niche)
 # Summary table
 sum.PM2 <- summary_table(f.PCAdata.PM.2, our_summary1)
 sum.PM2
+
+```
+
+```{r}
+
+#Load the substructure data
+data4boxplot <- read.csv('../results/PM_Cluster2.csv')
+
+#Substructure, Two main variables for the first 3 PCs
+#PC1
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = IntCluster,
+  y = MedianDistToContShelf_km,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "SubClusters PM2",
+  ylab = "MedianDistToContShelf_km") +
+  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+
+ggsave(filename = "../figures/PMC2_MedDist2Shelf.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = IntCluster,
+  y = MaxLat_degrees,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "SubClusters PM2",
+  ylab = "MaxLat_degrees") +
+  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+
+ggsave(filename = "../figures/PMC2_MaxLat.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#PC2
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = IntCluster,
+  y = d15N,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "SubClusters PM2",
+  ylab = "d15N") +
+  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+
+ggsave(filename = "../figures/PMC2_d15N.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = IntCluster,
+  y = d13C,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "SubClusters PM2",
+  ylab = "d13C") +
+  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+
+ggsave(filename = "../figures/PMC2_d13C.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#PC3
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = IntCluster,
+  y = Pct_BenthicDives,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "SubClusters PM2",
+  ylab = "Pct_BenthicDives") +
+  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+
+ggsave(filename = "../figures/PMC2_Pct_BenthicDives.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = IntCluster,
+  y = Pct_ForagingDives,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "SubClusters PM2",
+  ylab = "Pct_ForagingDives") +
+  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+
+ggsave(filename = "../figures/PMC2_Pct_ForagingDives.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
 
 ```
