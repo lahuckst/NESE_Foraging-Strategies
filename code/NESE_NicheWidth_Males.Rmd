@@ -59,28 +59,28 @@ row.names(m.PCAdata) <- m.PCAdata$MasterID
 m.PCAdata.1 <- na.omit(m.PCAdata)
 
 # HCPC with 3 PCs
-m.PCAdata.1 <- as.data.frame(scale(m.PCAdata.1[c(6:8)]))
+m.PCAdata.1.1 <- as.data.frame(scale(m.PCAdata.1[c(6:8)]))
 
 # Compute hierarchical clustering on principal components
-hc.m.all <- hclust(dist(m.PCAdata.1, method = "euclidean"), method ="ward.D2")
+hc.m.all <- hclust(dist(m.PCAdata.1.1, method = "euclidean"), method ="ward.D2")
 hc.m.all
 
 plot(hc.m.all, hang = -0.01, cex = 0.7)
 
 # Check how many clusters there are 
-res.nbclust <- NbClust(m.PCAdata.1, distance = "euclidean",
+res.nbclust <- NbClust(m.PCAdata.1.1, distance = "euclidean",
                        min.nc = 2, max.nc = 15, 
                        method = "ward.D2", index ="alllong")
 
 # Agree that 3 is the correct number of clusters
 # Compute hierarchical clustering on principal components
-fit <- cutree(hc.m.all, k =3)
-
+fit <- cutree(hc.m.all, k = 3)
 plot(hc.m.all)
 rect.hclust(hc.m.all, k=3, border="red")
 
 # Add the Cluster to the original table
-m.PCAdata.1$ClustersAll <-  cutree(hc.m.all, k =3)
+m.PCAdata.1$ClustersAll <-  paste('Cluster',cutree(hc.m.all, k =3))
+
 
 f <- fviz_dend(hc.m.all, 
                k =3,
@@ -97,7 +97,7 @@ ggsave(filename = "../figures/HC_MalesAll.pdf",
        device = cairo_pdf)
 
 # Bi-space
-f <- fviz_cluster(list(data = m.PCAdata.1, cluster = fit),
+f <- fviz_cluster(list(data = m.PCAdata.1.1, cluster = fit),
                   repel = TRUE,            # Avoid label overlapping
                   show.clust.cent = TRUE, # Show cluster centers
                   palette = "jco",         # Color palette see ?ggpubr::ggpar
@@ -120,13 +120,14 @@ Niche Analysis
 d <- 3
 Psi <- crossprod(matrix(rnorm(d^2), d, d)) # scale
 
-aggregate(m.PCAdata.1[1:3], m.PCAdata.1[4], mean)
+m.PCAdata.1.1$ClustersAll <-  paste('Cluster',cutree(hc.m.all, k =3))
+aggregate(m.PCAdata.1.1[1:3], m.PCAdata.1.1[4], mean)
 
 # Generate parameter draws
 nsamples <- 1e4
 system.time({
- PM.par <- tapply(1:nrow(m.PCAdata.1), m.PCAdata.1$ClustersAll,
-                    function(ii) niw.post(nsamples = nsamples, X = m.PCAdata.1[ii,1:3], Psi = Psi))
+ PM.par <- tapply(1:nrow(m.PCAdata.1.1), m.PCAdata.1.1$ClustersAll,
+                    function(ii) niw.post(nsamples = nsamples, X = m.PCAdata.1.1[ii,1:3], Psi = Psi))
 })
 
 
@@ -159,11 +160,11 @@ legend("topleft", legend = names(PM.par), fill = clrs)
 
 # 2-d projections of 50 niche regions
 nsamples <- 50
-PM.par <- tapply(1:nrow(m.PCAdata.1), m.PCAdata.1$ClustersAll,
-                  function(ii) niw.post(nsamples = nsamples, X = m.PCAdata.1[ii,1:3], Psi = Psi))
+PM.par <- tapply(1:nrow(m.PCAdata.1.1), m.PCAdata.1.1$ClustersAll,
+                  function(ii) niw.post(nsamples = nsamples, X = m.PCAdata.1.1[ii,1:3], Psi = Psi))
 
 # format data for plotting function
-PM.data <- tapply(1:nrow(m.PCAdata.1), m.PCAdata.1$ClustersAll, function(ii) X = m.PCAdata.1[ii,1:3])
+PM.data <- tapply(1:nrow(m.PCAdata.1.1), m.PCAdata.1.1$ClustersAll, function(ii) X = m.PCAdata.1.1[ii,1:3])
 
 pdf("../figures/NicheRegionsMalesAll.pdf")
 niche.plot(niche.par = PM.par, niche.data = PM.data, pfrac = .05,
@@ -178,8 +179,8 @@ niche.plot(niche.par = PM.par, niche.data = PM.data, pfrac = .05,
 
 # niche overlap plots for 95% niche region sizes
 nsamples <- 10000
-PM.par <- tapply(1:nrow(m.PCAdata.1), m.PCAdata.1$ClustersAll,
-                  function(ii) niw.post(nsamples = nsamples, X = m.PCAdata.1[ii,1:3], Psi = Psi))
+PM.par <- tapply(1:nrow(m.PCAdata.1.1), m.PCAdata.1.1$ClustersAll,
+                  function(ii) niw.post(nsamples = nsamples, X = m.PCAdata.1.1[ii,1:3], Psi = Psi))
 
 # Overlap calculation.  use nsamples = nprob = 10000 (1e4) for higher accuracy.
 # the variable over.stat can be supplied directly to the overlap.plot function
@@ -211,8 +212,8 @@ overlap.plot(over.stat.PM, col = clrs, mean.cred.col = "turquoise", equal.axis =
 
 # posterior distribution of (mu, Sigma) for each strategy
 nsamples <- 10000
-PM.par <- tapply(1:nrow(m.PCAdata.1), m.PCAdata.1$ClustersAll,
-                  function(ii) niw.post(nsamples = nsamples, X = m.PCAdata.1[ii,1:3], Psi = Psi))
+PM.par <- tapply(1:nrow(m.PCAdata.1.1), m.PCAdata.1.1$ClustersAll,
+                  function(ii) niw.post(nsamples = nsamples, X = m.PCAdata.1.1[ii,1:3], Psi = Psi))
 
 # posterior distribution of niche size by species using the 75% contour to define strategy niche
 PM.size <- sapply(PM.par, function(spec) {
@@ -255,7 +256,7 @@ for (sc in 1:3){
   
 }
 
-
+Olap.PM
 
 median(PM.size[,1])
 range(PM.size[,1])
@@ -271,9 +272,7 @@ plt.niche <- ggbetweenstats(
   data = PM.size2,
   x = Cluster,
   y = Niche_Size,
-  type = "rb",
-  box.args = list(width = 0),
-  point.args = list(alpha = 0),
+  pairwise.display = "none",
   xlab = "Clusters",
   ylab = "Niche Size"
   )
@@ -284,4 +283,53 @@ ggsave(filename = "../figures/NicheStrategies_Males.pdf",
 
 
 ```
+```{r}
 
+#Load the substructure data
+data4boxplot <- read.csv('../results/Males_Clusters.csv')
+
+# Plots for the variables
+#d13C
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = ClustersAll,
+  y = d13C,
+  pairwise.display = "none",
+  xlab = "Clusters",
+  ylab = "d13C"
+  )
+print(plt.niche)
+ggsave(filename = "../figures/Males_d13C.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+# Plots for the variables
+#d15N
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = ClustersAll,
+  y = d15N,
+  pairwise.display = "none",
+  xlab = "Clusters",
+  ylab = "d15N"
+  )
+print(plt.niche)
+ggsave(filename = "../figures/Males_d15N.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+# Plots for the variables
+#StdLength
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = ClustersAll,
+  y = StandardLength_cm,
+  pairwise.display = "none",
+  xlab = "Clusters",
+  ylab = "Standard Lenght (cm)"
+  )
+print(plt.niche)
+ggsave(filename = "../figures/Males_StandardLength_cm.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+```
