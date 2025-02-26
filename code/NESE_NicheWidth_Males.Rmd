@@ -294,7 +294,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = ClustersAll,
   y = d13C,
-  pairwise.display = "none",
+  #pairwise.display = "none",
   xlab = "Clusters",
   ylab = "d13C"
   )
@@ -309,7 +309,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = ClustersAll,
   y = d15N,
-  pairwise.display = "none",
+  #pairwise.display = "none",
   xlab = "Clusters",
   ylab = "d15N"
   )
@@ -324,7 +324,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = ClustersAll,
   y = StandardLength_cm,
-  pairwise.display = "none",
+  #pairwise.display = "none",
   xlab = "Clusters",
   ylab = "Standard Lenght (cm)"
   )
