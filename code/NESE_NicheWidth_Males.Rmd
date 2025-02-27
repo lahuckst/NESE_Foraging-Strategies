@@ -230,9 +230,9 @@ colnames(PM.size2) <- c("Niche_Size", "Cluster")
 PM.size2[1:10000,1] <- PM.size[,1]
 PM.size2[1:10000,2] <- 'Cluster 1'
 PM.size2[10001:20000,1] <- PM.size[,2]
-PM.size2[10001:20000,2] <- 'SubCluster 2'
+PM.size2[10001:20000,2] <- 'Cluster 2'
 PM.size2[20001:30000,1] <- PM.size[,3]
-PM.size2[20001:30000,2] <- 'SubCluster 3'
+PM.size2[20001:30000,2] <- 'Cluster 3'
 
 PM.size2 <- as.data.frame(PM.size2)
 PM.size2$Niche_Size <- as.numeric(PM.size2$Niche_Size)
@@ -326,7 +326,7 @@ plt.niche <- ggbetweenstats(
   y = StandardLength_cm,
   #pairwise.display = "none",
   xlab = "Clusters",
-  ylab = "Standard Lenght (cm)"
+  ylab = "Standard Length (cm)"
   )
 print(plt.niche)
 ggsave(filename = "../figures/Males_StandardLength_cm.pdf",
