@@ -215,6 +215,12 @@ ggsave(filename = "../figures/PCA_HCPC2D_PM.pdf",
 #Add the clusters to the original dataset
 
 f.PCAdata.PM$cluster <- paste('Cluster',res.hcpc.1.PM$data.clust$clust)
+
+#Re-arrange the CLuster Naems to match the Clusters in PB
+f.PCAdata.PM$cluster[which(f.PCAdata.PM$cluster == 'Cluster 1')] <- 'Cluster 0'
+f.PCAdata.PM$cluster[which(f.PCAdata.PM$cluster == 'Cluster 5')] <- 'Cluster 1'
+f.PCAdata.PM$cluster[which(f.PCAdata.PM$cluster == 'Cluster 0')] <- 'Cluster 5'
+
 write.csv(f.PCAdata.PM,'../results/PM_Clusters.csv')
 
 ################################################################################################################################################################################################################
@@ -230,7 +236,7 @@ Psi <- crossprod(matrix(rnorm(d^2), d, d)) # scale
 temp <-  tibble::rownames_to_column(f.PCAdata.PM, "AnimalID")
 data4Niche.PM <- merge(temp, ind.PCAPM, by = 'AnimalID')
 
-data4Niche.PM <- data4Niche.PM[!data4Niche.PM$cluster == "Cluster 1",] #Get rid of cluster as there's only one individual
+data4Niche.PM <- data4Niche.PM[!data4Niche.PM$cluster == "Cluster 5",] #Get rid of cluster as there's only one individual
 
 aggregate(data4Niche.PM[29:34], data4Niche.PM[28], mean)
 
