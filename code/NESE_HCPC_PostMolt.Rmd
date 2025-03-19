@@ -165,7 +165,7 @@ res.hcpc.1.PM <- HCPC(res.pca.f.1.PM,
                       method = "ward", 
                       graph = FALSE)
 
-plot(res.hcpc.1.PM) # 3 clusters
+plot(res.hcpc.1.PM) # 5 clusters
 
 # Check that k is right
 ind.PCAPM <- get_pca_ind(res.pca.f.1.PM)
@@ -224,7 +224,10 @@ f.PCAdata.PM$cluster[which(f.PCAdata.PM$cluster == 'Cluster 0')] <- 'Cluster 5'
 write.csv(f.PCAdata.PM,'../results/PM_Clusters.csv')
 
 ################################################################################################################################################################################################################
+```
 
+Niche analysis
+```{r}
 # Extract the PCA values
 ind.PCAPM <- get_pca_ind(PCA.f.1.PM)
 ind.PCAPM <- data.frame(ind.PCAPM$coord[,1:6])
@@ -345,13 +348,13 @@ rbind(est = colMeans(PM.size),
 PM.size2 <- matrix(NA, nrow = 40000, ncol = 2)
 colnames(PM.size2) <- c("Niche_Size", "Cluster")
 PM.size2[1:10000,1] <- PM.size[,1]
-PM.size2[1:10000,2] <- 'SubCluster 2'
+PM.size2[1:10000,2] <- colnames(PM.size)[1]
 PM.size2[10001:20000,1] <- PM.size[,2]
-PM.size2[10001:20000,2] <- 'SubCluster 3'
+PM.size2[10001:20000,2] <- colnames(PM.size)[2]
 PM.size2[20001:30000,1] <- PM.size[,3]
-PM.size2[20001:30000,2] <- 'SubCluster 4'
+PM.size2[20001:30000,2] <- colnames(PM.size)[3]
 PM.size2[30001:40000,1] <- PM.size[,4]
-PM.size2[30001:40000,2] <- 'SubCluster 5'
+PM.size2[30001:40000,2] <- colnames(PM.size)[4]
 PM.size2 <- as.data.frame(PM.size2)
 PM.size2$Niche_Size <- as.numeric(PM.size2$Niche_Size)
 
@@ -359,15 +362,15 @@ PM.size2$Niche_Size <- as.numeric(PM.size2$Niche_Size)
 # Create an empty matrix
 
 Olap.PM <- matrix(NA,4,4)
-colnames(Olap.PM) <- c('Cluster 2',
+colnames(Olap.PM) <- c('Cluster 1',
+                        'Cluster 2',
                         'Cluster 3',
-                        'Cluster 4',
-                       'Cluster 5')
+                       'Cluster 4')
 
-rownames(Olap.PM) <- c('Cluster 2',
+rownames(Olap.PM) <- c('Cluster 1',
+                        'Cluster 2',
                         'Cluster 3',
-                        'Cluster 4',
-                       'Cluster 5')
+                       'Cluster 4')
 
 for (sc in 1:4){
   for (sc2 in 1:4){
