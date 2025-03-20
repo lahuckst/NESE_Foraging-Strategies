@@ -354,7 +354,7 @@ PM.size2[10001:20000,2] <- colnames(PM.size)[2]
 PM.size2[20001:30000,1] <- PM.size[,3]
 PM.size2[20001:30000,2] <- colnames(PM.size)[3]
 PM.size2[30001:40000,1] <- PM.size[,4]
-PM.size2[30001:40000,2] <- colnames(PM.size)[4]
+PM.size2[30001:40000,2] <- colnames(PM.size)[1]
 PM.size2 <- as.data.frame(PM.size2)
 PM.size2$Niche_Size <- as.numeric(PM.size2$Niche_Size)
 
