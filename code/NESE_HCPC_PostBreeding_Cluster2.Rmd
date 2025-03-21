@@ -344,11 +344,11 @@ rbind(est = colMeans(PB2.size),
 PB2.size2 <- matrix(NA, nrow = 30000, ncol = 2)
 colnames(PB2.size2) <- c("Niche_Size", "SubCluster")
 PB2.size2[1:10000,1] <- PB2.size[,1]
-PB2.size2[1:10000,2] <- 'SubCluster 1'
+PB2.size2[1:10000,2] <- colnames(PB2.size)[1]
 PB2.size2[10001:20000,1] <- PB2.size[,2]
-PB2.size2[10001:20000,2] <- 'SubCluster 2'
+PB2.size2[10001:20000,2] <- colnames(PB2.size)[1]
 PB2.size2[20001:30000,1] <- PB2.size[,3]
-PB2.size2[20001:30000,2] <- 'SubCluster 3'
+PB2.size2[20001:30000,2] <- colnames(PB2.size)[1]
 PB2.size2 <- as.data.frame(PB2.size2)
 PB2.size2$Niche_Size <- as.numeric(PB2.size2$Niche_Size)
 
