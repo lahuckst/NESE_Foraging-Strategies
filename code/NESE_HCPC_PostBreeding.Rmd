@@ -1,7 +1,7 @@
 ---
 title: "NESE_HCPC_PostBreeding"
 author: "Luis Huckstadt"
-date: "2024-07-16"
+date: "2025-04-01"
 output: html_document
 ---
 
@@ -388,5 +388,142 @@ sum.PB <- summary_table(f.PCAdata.PB, our_summary1)
 sum.PB
 
 saveRDS(f.PCAdata.PB, file = '../data/f.PCAdata.PB.rds')
+
+```
+
+```{r}
+
+#Load the substructure data
+data4boxplot <- read.csv('../results/PB_Clusters.csv')
+
+#Substructure, Two main variables for the first 3 PCs
+#PC1
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = cluster,
+  y = SdDistContShelf_km,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "PB Clusters",
+  ylab = "SdDistContShelf_km") +
+  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999'))
+
+ggsave(filename = "../figures/PB_SdDistContShelf_km.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = cluster,
+  y = MedianDistToContShelf_km,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "PB Clusters",
+  ylab = "MedianDistToContShelf_km") +
+  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999'))
+
+ggsave(filename = "../figures/PB_MedianDistToContShelf_km.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#PC2
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = cluster,
+  y = Mean_Duration_sec,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "PB Clusters",
+  ylab = "Mean_Duration_sec") +
+  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999'))
+
+ggsave(filename = "../figures/PB_Mean_Duration_sec.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = cluster,
+  y = d13C,
+   pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "PB Clusters",
+  ylab = "d13C") +
+  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999'))
+
+ggsave(filename = "../figures/PB_d13C.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#PC3
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = cluster,
+  y = MesoEcoProportionShelf,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "PB Clusters",
+  ylab = "MesoEcoProportionShelf") +
+  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999'))
+
+ggsave(filename = "../figures/PB_MesoEcoProportionShelf.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = cluster,
+  y = DeepNightForageDivesMedian_m,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "PB Clusters",
+  ylab = "DeepNightForageDivesMedian_m") +
+  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999'))
+
+ggsave(filename = "../figures/PB_DeepNightForageDivesMedian_m.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
 
 ```

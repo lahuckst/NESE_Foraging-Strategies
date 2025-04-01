@@ -418,3 +418,140 @@ sum.PM
 
 saveRDS(f.PCAdata.PM, file = '../data/f.PCAdata.PM.rds')
 ```
+
+```{r}
+
+#Load the substructure data
+data4boxplot <- read.csv('../results/PM_Clusters.csv')
+
+#Substructure, Two main variables for the first 3 PCs
+#PC1
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = cluster,
+  y = MedianDistToContShelf_km,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "PM Clusters",
+  ylab = "MedianDistToContShelf_km") +
+  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999'))
+
+ggsave(filename = "../figures/PM_MedianDistToContShelf_km.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = cluster,
+  y = MesoEcoProportionNorthCPac,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "PM Clusters",
+  ylab = "MesoEcoProportionNorthCPac") +
+  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999'))
+
+ggsave(filename = "../figures/PM_MesoEcoProportionNorthCPac.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#PC2
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = cluster,
+  y = d13C,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "PM Clusters",
+  ylab = "d13C") +
+  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999'))
+
+ggsave(filename = "../figures/PM_d13C.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = cluster,
+  y = MesoEcoProportionCAC,
+   pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "PM Clusters",
+  ylab = "MesoEcoProportionCAC") +
+  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999'))
+
+ggsave(filename = "../figures/PM_MesoEcoProportionCAC.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#PC3
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = cluster,
+  y = DeepNightForageDivesMedian_m,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "PM Clusters",
+  ylab = "DeepNightForageDivesMedian_m") +
+  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999'))
+
+ggsave(filename = "../figures/PM_DeepNightForageDivesMedian_m.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+#
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = cluster,
+  y = Mean_Depth_m,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "PM Clusters",
+  ylab = "Mean_Depth_m") +
+  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999'))
+
+ggsave(filename = "../figures/PM_Mean_Depth_m.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+```
