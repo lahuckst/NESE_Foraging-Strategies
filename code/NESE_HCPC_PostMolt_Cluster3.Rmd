@@ -1,7 +1,7 @@
 ---
 title: "NESE HCPC PostMolt Cluster3"
 author: "Luis Huckstadt"
-date: "2024-07-19"
+date: "2025-04-02"
 output: html_document
 ---
 
@@ -68,9 +68,8 @@ f.PCAdata.PM <- readRDS("../data/f.PCAdata.PM.rds")
 PM Cluster 3
 
 ```{r}
-#f.PCAdata.PM.1 <- filter(f.PCAdata.PM, cluster == "Cluster 1")
 
-f.PCAdata.PM.3 <- filter(f.PCAdata.PM, cluster == "Cluster 3") # Extract the data just for Females in PM Cluster 2
+f.PCAdata.PM.3 <- filter(f.PCAdata.PM, cluster == "Cluster 3") # Extract the data just for Females in PM Cluster 3
 row.names(f.PCAdata.PM.3) <- f.PCAdata.PM.3$TOPPID
 
 #First exploratory PCA with all data, including Isotopes
