@@ -61,7 +61,8 @@ our_summary1 <-
   )
 
 # Import the data
-f.PCAdata.PM <- readRDS("../data/f.PCAdata.PM.rds")
+f.PCAdata.PM <- read.csv('../results/PM_Clusters.csv')
+f.PCAdata.PM <- f.PCAdata.PM[,2:ncol(f.PCAdata.PM)]
 
 ```
 
@@ -69,6 +70,7 @@ PM Cluster 1
 
 ```{r}
 f.PCAdata.PM.1 <- filter(f.PCAdata.PM, cluster == "Cluster 1") # Extract the data just for Females in PM Cluster 1
+
 row.names(f.PCAdata.PM.1) <- f.PCAdata.PM.1$TOPPID
 
 #First exploratory PCA with all data, including Isotopes
@@ -94,14 +96,14 @@ cumpro <- cumsum(PCA.f.1.PM.1$sdev^2 / sum(PCA.f.1.PM.1$sdev^2))
 pdf("../figures/PCACumulativeVariance_PM1.pdf")
 plot(cumpro[0:10], xlab = "PC #", ylab = "Amount of explained variance", main = "Cumulative variance plot")
 abline(v = 7, col="blue", lty=5)
-abline(h = 0.8317     , col="blue", lty=5) # Cumulative variance explained by the 10 PCs
+abline(h = 0.8317, col="blue", lty=5) # Cumulative variance explained by the 10 PCs
 legend("topleft", legend=c("Cut-off @ PC 7"),
        col=c("blue"), lty=5, cex=0.6)
 dev.off()
 
 plot(cumpro[0:10], xlab = "PC #", ylab = "Amount of explained variance", main = "Cumulative variance plot")
 abline(v = 7, col="blue", lty=5)
-abline(h = 0.8317     , col="blue", lty=5) # Cumulative variance explained by the 10 PCs
+abline(h = 0.8317, col="blue", lty=5) # Cumulative variance explained by the 10 PCs
 legend("topleft", legend=c("Cut-off @ PC 7"),
        col=c("blue"), lty=5, cex=0.6)
 
@@ -117,7 +119,7 @@ autoplot(PCA.f.1.PM.1, data = f.PCAdata.PM.1, colour = 'ProcedureYear', loadings
 # Fancy plot with ellipses
 f <- fviz_pca_ind(PCA.f.1.PM.1, geom.ind = "point", pointshape = 21, 
              pointsize = 2, 
-             fill.ind = f.PCAdata.PM.1$ProcedureYear, 
+             fill.ind = as.factor(f.PCAdata.PM.1$ProcedureYear), 
              col.ind = "black", 
              palette = "simpsons", 
              addEllipses = TRUE,
@@ -174,7 +176,7 @@ ind.PCAPM.1 <- data.frame(ind.PCAPM.1$coord[,1:7])
 #ind.PCAM2 <- ind.PCAPM[,col2keep]
 
 res.nbclust <- NbClust(ind.PCAPM.1, distance = "euclidean",
-                       min.nc = 2, max.nc = 15, 
+                       min.nc = 2, max.nc = 10, 
                        method = "ward.D", index ="alllong")
 
 # Agree that 3 is the correct number of clusters
@@ -471,16 +473,16 @@ print(plt.niche)
 plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = IntCluster,
-  y = Mean_Duration_sec,
+  y = Mean_Depth_m,
   pairwise.display = "none",
   #type = "rb",
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM1",
-  ylab = "Mean_Duration_sec") +
+  ylab = "Mean_Depth_m") +
   ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3','#e7298a'))
 
-ggsave(filename = "../figures/PMC1_Mean_Duration_sec.pdf",
+ggsave(filename = "../figures/PMC1_Mean_Depth_m.pdf",
        plot = plt.niche,
        device = cairo_pdf)
 

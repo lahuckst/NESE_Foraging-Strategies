@@ -61,8 +61,8 @@ our_summary1 <-
   )
 
 # Import the data
-f.PCAdata.PM <- readRDS("../data/f.PCAdata.PM.rds")
-
+f.PCAdata.PM <- read.csv('../results/PM_Clusters.csv')
+f.PCAdata.PM <- f.PCAdata.PM[,2:ncol(f.PCAdata.PM)]
 ```
 
 PM Cluster 2
