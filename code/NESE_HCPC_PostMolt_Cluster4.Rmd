@@ -1,7 +1,7 @@
 ---
 title: "NESE HCPC PostMolt Cluster4"
 author: "Luis Huckstadt"
-date: "2024-07-22"
+date: "2025-04-02"
 output: html_document
 ---
 
@@ -531,26 +531,26 @@ print(plt.niche)
 ```{r}
 
 #Load the substructure data
-data4boxplot <- read.csv('../results/PM_Cluster.csv')
+ read.csv('../results/PM_Cluster4.csv')
 
 #Substructure, Two main variables for the first 3 PCs
 #PC1
 #
 plt.niche <- ggbetweenstats(
   data = data4boxplot,
-  x = cluster,
-  y = MedianDistToContShelf_km,
+  x = IntCluster,
+  y = MesoEcoProportionNorthCPac,
   pairwise.display = "none",
   #type = "rb",
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
-    xlab = "PM Clusters",
-  ylab = "MedianDistToContShelf_km") +
+    xlab = "SubClusters PMC4",
+  ylab = "MesoEcoProportionNorthCPac") +
   ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
                                '#ff7f00','#ffff33','#a65628','#f781bf',
                                '#999999'))
 
-ggsave(filename = "../figures/PM_MedianDistToContShelf_km.pdf",
+ggsave(filename = "../figures/PMC4_MesoEcoProportionNorthCPac.pdf",
        plot = plt.niche,
        device = cairo_pdf)
 
@@ -559,19 +559,19 @@ print(plt.niche)
 #
 plt.niche <- ggbetweenstats(
   data = data4boxplot,
-  x = cluster,
-  y = MesoEcoProportionNorthCPac,
+  x = IntCluster,
+  y = MesoEcoProportionSubArcticPac,
   pairwise.display = "none",
   #type = "rb",
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
-    xlab = "PM Clusters",
-  ylab = "MesoEcoProportionNorthCPac") +
+    xlab = "SubClusters PMC4",
+  ylab = "MesoEcoProportionSubArcticPac") +
   ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
                                '#ff7f00','#ffff33','#a65628','#f781bf',
                                '#999999'))
 
-ggsave(filename = "../figures/PM_MesoEcoProportionNorthCPac.pdf",
+ggsave(filename = "../figures/PMC4_MesoEcoProportionSubArcticPac.pdf",
        plot = plt.niche,
        device = cairo_pdf)
 
@@ -581,19 +581,19 @@ print(plt.niche)
 #
 plt.niche <- ggbetweenstats(
   data = data4boxplot,
-  x = cluster,
-  y = d13C,
+  x = IntCluster,
+  y = Pct_BenthicDives,
   pairwise.display = "none",
   #type = "rb",
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
-    xlab = "PM Clusters",
-  ylab = "d13C") +
+    xlab = "SubClusters PMC4",
+  ylab = "Pct_BenthicDives") +
   ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
                                '#ff7f00','#ffff33','#a65628','#f781bf',
                                '#999999'))
 
-ggsave(filename = "../figures/PM_d13C.pdf",
+ggsave(filename = "../figures/PMC4_Pct_BenthicDives.pdf",
        plot = plt.niche,
        device = cairo_pdf)
 
@@ -602,19 +602,19 @@ print(plt.niche)
 #
 plt.niche <- ggbetweenstats(
   data = data4boxplot,
-  x = cluster,
-  y = MesoEcoProportionCAC,
+  x = IntCluster,
+  y = d15N,
    pairwise.display = "none",
   #type = "rb",
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
-    xlab = "PM Clusters",
-  ylab = "MesoEcoProportionCAC") +
+    xlab = "SubClusters PMC4",
+  ylab = "d15N") +
   ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
                                '#ff7f00','#ffff33','#a65628','#f781bf',
                                '#999999'))
 
-ggsave(filename = "../figures/PM_MesoEcoProportionCAC.pdf",
+ggsave(filename = "../figures/PMC4_d15N.pdf",
        plot = plt.niche,
        device = cairo_pdf)
 
@@ -624,19 +624,19 @@ print(plt.niche)
 #
 plt.niche <- ggbetweenstats(
   data = data4boxplot,
-  x = cluster,
-  y = DeepDayForageDivesMedian_m,
+  x = IntCluster,
+  y = Mean_Depth_m,
   pairwise.display = "none",
   #type = "rb",
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
-    xlab = "PM Clusters",
-  ylab = "DeepNightForageDivesMedian_m") +
+    xlab = "SubClusters PMC4",
+  ylab = "Mean_Depth_m") +
   ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
                                '#ff7f00','#ffff33','#a65628','#f781bf',
                                '#999999'))
 
-ggsave(filename = "../figures/PM_DeepNightForageDivesMedian_m.pdf",
+ggsave(filename = "../figures/PMC4_Mean_Depth_m.pdf",
        plot = plt.niche,
        device = cairo_pdf)
 
@@ -645,19 +645,19 @@ print(plt.niche)
 #
 plt.niche <- ggbetweenstats(
   data = data4boxplot,
-  x = cluster,
-  y = Mean_Depth_m,
+  x = IntCluster,
+  y = DeepNightForageDivesMedian_m,
   pairwise.display = "none",
   #type = "rb",
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
-    xlab = "PM Clusters",
-  ylab = "Mean_Depth_m") +
+    xlab = "SubClusters PMC4",
+  ylab = "DeepNightForageDivesMedian_m") +
   ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
                                '#ff7f00','#ffff33','#a65628','#f781bf',
                                '#999999'))
 
-ggsave(filename = "../figures/PM_Mean_Depth_m.pdf",
+ggsave(filename = "../figures/PMC4_DeepNightForageDivesMedian_m.pdf",
        plot = plt.niche,
        device = cairo_pdf)
 
