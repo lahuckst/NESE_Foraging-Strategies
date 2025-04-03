@@ -448,7 +448,8 @@ our_summary1 &lt;-
   )
 
 # Import the data
-f.PCAdata.PM &lt;- readRDS(&quot;../data/f.PCAdata.PM.rds&quot;)</code></pre>
+f.PCAdata.PM &lt;- read.csv(&#39;../results/PM_Clusters.csv&#39;)
+f.PCAdata.PM &lt;- f.PCAdata.PM[,2:ncol(f.PCAdata.PM)]</code></pre>
 <p>PM Cluster 2</p>
 <pre class="r"><code>f.PCAdata.PM.2 &lt;- filter(f.PCAdata.PM, cluster == &quot;Cluster 2&quot;) # Extract the data just for Females in PM Cluster 2
 row.names(f.PCAdata.PM.2) &lt;- f.PCAdata.PM.2$TOPPID
@@ -532,7 +533,7 @@ dev.off()</code></pre>
 <pre class="r"><code># Fancy plot with ellipses
 f &lt;- fviz_pca_ind(PCA.f.1.PM.2, geom.ind = &quot;point&quot;, pointshape = 21, 
              pointsize = 2, 
-             fill.ind = f.PCAdata.PM.2$ProcedureYear, 
+             fill.ind = as.factor(f.PCAdata.PM.2$ProcedureYear), 
              col.ind = &quot;black&quot;, 
              palette = &quot;simpsons&quot;, 
              addEllipses = TRUE,
@@ -712,7 +713,7 @@ system.time({
                     function(ii) niw.post(nsamples = nsamples, X = data4Niche.PM.2[ii,30:35], Psi = Psi))
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##    1.84    0.03    2.29</code></pre>
+##    1.19    0.03    1.24</code></pre>
 <pre class="r"><code># various parameter plots
 clrs &lt;- c(&quot;#a6cee3&quot;,
           &quot;#1f78b4&quot;,

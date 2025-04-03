@@ -115,7 +115,7 @@ dev.off()
 # Fancy plot with ellipses
 f <- fviz_pca_ind(PCA.f.1.PM.2, geom.ind = "point", pointshape = 21, 
              pointsize = 2, 
-             fill.ind = f.PCAdata.PM.2$ProcedureYear, 
+             fill.ind = as.factor(f.PCAdata.PM.2$ProcedureYear), 
              col.ind = "black", 
              palette = "simpsons", 
              addEllipses = TRUE,
