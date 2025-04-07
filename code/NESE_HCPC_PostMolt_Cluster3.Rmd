@@ -61,8 +61,8 @@ our_summary1 <-
   )
 
 # Import the data
-f.PCAdata.PM <- readRDS("../data/f.PCAdata.PM.rds")
-
+f.PCAdata.PM <- read.csv('../results/PM_Clusters.csv')
+f.PCAdata.PM <- f.PCAdata.PM[,2:ncol(f.PCAdata.PM)]
 ```
 
 PM Cluster 3
@@ -118,7 +118,7 @@ autoplot(PCA.f.1.PM.3, data = f.PCAdata.PM.3, colour = 'ProcedureYear', loadings
 # Fancy plot with ellipses
 f <- fviz_pca_ind(PCA.f.1.PM.3, geom.ind = "point", pointshape = 21, 
              pointsize = 2, 
-             fill.ind = f.PCAdata.PM.3$ProcedureYear, 
+             fill.ind = as.factor(f.PCAdata.PM.3$ProcedureYear), 
              col.ind = "black", 
              palette = "simpsons", 
              addEllipses = TRUE,
@@ -177,7 +177,7 @@ ind.PCAPM.3 <- data.frame(ind.PCAPM.3$coord[,1:5])
 #ind.PCAM2 <- ind.PCAPM[,col2keep]
 
 res.nbclust <- NbClust(ind.PCAPM.3, distance = "euclidean",
-                       min.nc = 2, max.nc = 8, 
+                       min.nc = 3, max.nc = 11, 
                        method = "ward.D", index ="alllong")
 
 # Agree that 4 is the correct number of clusters
@@ -510,16 +510,16 @@ print(plt.niche)
 plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = IntCluster,
-  y = MinLon_degrees,
+  y = MaxLat_degrees,
   pairwise.display = "none",
   #type = "rb",
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM3",
-  ylab = "MinLon_degrees") +
+  ylab = "MaxLat_degrees") +
   ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3','#e7298a'))
 
-ggsave(filename = "../figures/PMC3_MinLon_degrees.pdf",
+ggsave(filename = "../figures/PMC3_MaxLat_degrees.pdf",
        plot = plt.niche,
        device = cairo_pdf)
 
