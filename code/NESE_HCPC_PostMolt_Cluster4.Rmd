@@ -61,7 +61,9 @@ our_summary1 <-
   )
 
 # Import the data
-f.PCAdata.PM <- readRDS("../data/f.PCAdata.PM.rds")
+# Import the data
+f.PCAdata.PM <- read.csv('../results/PM_Clusters.csv')
+f.PCAdata.PM <- f.PCAdata.PM[,2:ncol(f.PCAdata.PM)]
 
 ```
 
@@ -120,7 +122,7 @@ autoplot(PCA.f.1.PM.4, data = f.PCAdata.PM.4, colour = 'ProcedureYear', loadings
 # Fancy plot with ellipses
 f <- fviz_pca_ind(PCA.f.1.PM.4, geom.ind = "point", pointshape = 21, 
              pointsize = 2, 
-             fill.ind = f.PCAdata.PM.4$ProcedureYear, 
+             fill.ind = as.factor(f.PCAdata.PM.4$ProcedureYear), 
              col.ind = "black", 
              palette = "simpsons", 
              addEllipses = TRUE,
