@@ -11,7 +11,7 @@
 
 <meta name="author" content="Luis Huckstadt" />
 
-<meta name="date" content="2025-04-02" />
+<meta name="date" content="2025-04-09" />
 
 <title>NESE HCPC PostMolt Cluster2</title>
 
@@ -352,7 +352,7 @@ display: none;
 
 <h1 class="title toc-ignore">NESE HCPC PostMolt Cluster2</h1>
 <h4 class="author">Luis Huckstadt</h4>
-<h4 class="date">2025-04-02</h4>
+<h4 class="date">2025-04-09</h4>
 
 </div>
 
@@ -713,7 +713,7 @@ system.time({
                     function(ii) niw.post(nsamples = nsamples, X = data4Niche.PM.2[ii,30:35], Psi = Psi))
 })</code></pre>
 <pre><code>##    user  system elapsed 
-##    1.19    0.03    1.24</code></pre>
+##    1.92    0.14    2.37</code></pre>
 <pre class="r"><code># various parameter plots
 clrs &lt;- c(&quot;#a6cee3&quot;,
           &quot;#1f78b4&quot;,
@@ -995,7 +995,7 @@ plt.niche &lt;- ggbetweenstats(
   data = data4boxplot,
   x = IntCluster,
   y = MedianDistToContShelf_km,
-  pairwise.display = &quot;none&quot;,
+  pairwise.display = &quot;all&quot;,
   #type = &quot;rb&quot;,
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
@@ -1015,7 +1015,7 @@ plt.niche &lt;- ggbetweenstats(
   data = data4boxplot,
   x = IntCluster,
   y = MaxLat_degrees,
-  pairwise.display = &quot;none&quot;,
+  pairwise.display = &quot;all&quot;,
   #type = &quot;rb&quot;,
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
@@ -1036,7 +1036,7 @@ plt.niche &lt;- ggbetweenstats(
   data = data4boxplot,
   x = IntCluster,
   y = d15N,
-  pairwise.display = &quot;none&quot;,
+  pairwise.display = &quot;all&quot;,
   #type = &quot;rb&quot;,
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
@@ -1056,7 +1056,7 @@ plt.niche &lt;- ggbetweenstats(
   data = data4boxplot,
   x = IntCluster,
   y = d13C,
-  pairwise.display = &quot;none&quot;,
+  pairwise.display = &quot;all&quot;,
   #type = &quot;rb&quot;,
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
@@ -1077,7 +1077,7 @@ plt.niche &lt;- ggbetweenstats(
   data = data4boxplot,
   x = IntCluster,
   y = Pct_BenthicDives,
-  pairwise.display = &quot;none&quot;,
+  pairwise.display = &quot;all&quot;,
   #type = &quot;rb&quot;,
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
@@ -1097,7 +1097,7 @@ plt.niche &lt;- ggbetweenstats(
   data = data4boxplot,
   x = IntCluster,
   y = Pct_ForagingDives,
-  pairwise.display = &quot;none&quot;,
+  pairwise.display = &quot;all&quot;,
   #type = &quot;rb&quot;,
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
