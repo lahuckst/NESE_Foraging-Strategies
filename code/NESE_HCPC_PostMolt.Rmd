@@ -1,7 +1,7 @@
 ---
 title: "NESE_HCPC_PostMoult"
 author: "Luis Huckstadt"
-date: "2025-04-01"
+date: "2025-04-09"
 output: html_document
 ---
 
@@ -431,7 +431,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = cluster,
   y = MedianDistToContShelf_km,
-  pairwise.display = "none",
+  pairwise.display = "all",
   #type = "rb",
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
@@ -452,7 +452,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = cluster,
   y = MesoEcoProportionNorthCPac,
-  pairwise.display = "none",
+  pairwise.display = "all",
   #type = "rb",
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
@@ -474,7 +474,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = cluster,
   y = d13C,
-  pairwise.display = "none",
+  pairwise.display = "all",
   #type = "rb",
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
@@ -495,7 +495,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = cluster,
   y = MesoEcoProportionCAC,
-   pairwise.display = "none",
+   pairwise.display = "all",
   #type = "rb",
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
@@ -517,7 +517,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = cluster,
   y = DeepNightForageDivesMedian_m,
-  pairwise.display = "none",
+  pairwise.display = "all",
   #type = "rb",
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
@@ -538,7 +538,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = cluster,
   y = Mean_Depth_m,
-  pairwise.display = "none",
+  pairwise.display = "all",
   #type = "rb",
   #box.args = list(width = 0),
   #point.args = list(alpha = 0),
