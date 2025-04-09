@@ -1,7 +1,7 @@
 ---
 title: "NESE_NicheWidth_Males"
 author: "Luis Huckstadt"
-date: "2024-07-24"
+date: "2025-04-09"
 output: html_document
 ---
 
@@ -295,7 +295,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = IntClusters,
   y = d13C,
-  #pairwise.display = "none",
+  pairwise.display = "all",
   xlab = "Clusters",
   ylab = "d13C"
   )
@@ -310,7 +310,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = IntClusters,
   y = d15N,
-  #pairwise.display = "none",
+  pairwise.display = "all",
   xlab = "Clusters",
   ylab = "d15N"
   )
@@ -325,7 +325,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = IntClusters,
   y = StandardLength_cm,
-  #pairwise.display = "none",
+  pairwise.display = "all",
   xlab = "Clusters",
   ylab = "Standard Length (cm)"
   )
