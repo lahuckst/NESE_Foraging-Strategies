@@ -47,9 +47,12 @@ col4PCA <- c('MasterID','MainID','Trip','Sex','ProcedureYear','d13C',	'd15N',
 PCAdata <- data_iso[,col4PCA] 
 PCAdata$ProcedureYear <- as.factor(PCAdata$ProcedureYear)
 m.PCAdata <- dplyr::filter(PCAdata, Sex == "Male") # Extract the data just for males , 48 males
+m.PCAdata$MasterID <- paste(substring(m.PCAdata$MasterID, 1, 6),substring(m.PCAdata$MasterID, 16, 19),sep='') # Shorten the IDs for the plot
+rownames(m.PCAdata) <- m.PCAdata[,1] # Assign row names
+
 ```
 
-Analysis for Male PNESE 
+Analysis for Male NESE 
 
 ```{r}
 row.names(m.PCAdata) <- m.PCAdata$MasterID
@@ -84,7 +87,7 @@ m.PCAdata.1$ClustersAll <-  paste('Cluster',cutree(hc.m.all, k =3))
 
 f <- fviz_dend(hc.m.all, 
                k =3,
-               cex = 0.7,                     # Label size
+               cex = 0.6,                     # Label size
                palette = "jco",               # Color palette see ?ggpubr::ggpar
                rect = TRUE, rect_fill = TRUE, # Add rectangle around groups
                rect_border = "jco",           # Rectangle color

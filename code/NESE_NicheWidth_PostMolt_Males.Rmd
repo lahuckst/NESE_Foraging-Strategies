@@ -1,7 +1,7 @@
 ---
 title: "NESE_NicheWidth_Males"
 author: "Luis Huckstadt"
-date: "2024-07-24"
+date: "2025-04-09"
 output: html_document
 ---
 
@@ -34,7 +34,7 @@ library(pvclust)
 
 ```
 
-NICHEROVER analyses for females and males
+NICHEROVER analyses for males
 
 ```{r}
 
@@ -48,6 +48,8 @@ PCAdata <- data_iso[,col4PCA]
 PCAdata$ProcedureYear <- as.factor(PCAdata$ProcedureYear)
 m.PCAdata <- dplyr::filter(PCAdata, Sex == "Male") # Extract the data just for males , 48 males
 m.PCAdata <- dplyr::filter(m.PCAdata, Trip == "PostMolt") # Extract the data just for PB males , 23 males
+m.PCAdata$MasterID <- paste(substring(m.PCAdata$MasterID, 1, 6),substring(m.PCAdata$MasterID, 16, 19),sep='') # Shorten the IDs for the plot
+rownames(m.PCAdata) <- m.PCAdata[,1] # Assign row names
 
 ```
 
@@ -85,7 +87,7 @@ m.PCAdata.1$IntClusters <-  paste('Cluster',cutree(hc.m.all, k =3))
 
 f <- fviz_dend(hc.m.all, 
                k =3,
-               cex = 0.7,                     # Label size
+               cex = 0.6,                     # Label size
                palette = "jco",               # Color palette see ?ggpubr::ggpar
                rect = TRUE, rect_fill = TRUE, # Add rectangle around groups
                rect_border = "jco",           # Rectangle color
@@ -295,7 +297,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = IntClusters,
   y = d13C,
-  #pairwise.display = "none",
+  pairwise.display = "all",
   xlab = "Clusters",
   ylab = "d13C"
   )
@@ -310,7 +312,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = IntClusters,
   y = d15N,
-  #pairwise.display = "none",
+  pairwise.display = "all",
   xlab = "Clusters",
   ylab = "d15N"
   )
@@ -325,7 +327,7 @@ plt.niche <- ggbetweenstats(
   data = data4boxplot,
   x = IntClusters,
   y = StandardLength_cm,
-  #pairwise.display = "none",
+  pairwise.display = "all",
   xlab = "Clusters",
   ylab = "Standard Length (cm)"
   )
