@@ -1,0 +1,319 @@
+---
+title: "NESE_FemaleRepetabilityIsotopes"
+author: "Sarah Peterson & Luis Huckstadt"
+date: "2025-04-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This code was originally written by Sarah Peterson and edited as a R Markdown document by Luis Huckstadt for the publication
+
+Load the libraries and import the  data
+```{r}
+library(plyr)
+library(rptR)
+library(lme4)
+library(car)
+library(afex)
+library(ggpubr)
+library(predictmeans)
+library(gridExtra)
+
+#read in the master file with the data
+data_iso <- readRDS('../data/NESE_RepeatData.rds')
+
+
+#subset to just seals that have isotope data at arrival (no San Nic seals)
+#includes ONLY seals at arrivel (and not after fasting) and only the seals that have been
+#vetted for the isotopes paper (removes just a handful of seals for a variety of reasons)
+Isotopes<-subset(data_iso,!is.na(d13C)&TimePeriod=="Arrival"&(MainID!="RG180"&MainID!="RG182"
+  &MainID!="RG184"&MainID!="RG185"&MainID!="RG187"&MainID!="RG191"))
+
+#total 304 samples
+length(unique(Isotopes$animalID)) #from 304 unique seals, males and females (236 females)
+rm(data_iso)
+```
+
+Identify repeat seals
+
+```{r}
+#identify.repeat.seals
+summ.count.seals<-ddply(Isotopes,c("MainID","Sex"),summarise,
+  n.samples=length(d13C))
+summ.count.seals.repeat<-subset(summ.count.seals,n.samples>1)
+a<-unique(summ.count.seals.repeat$MainID)
+
+#subset Isotopes dataset into just repeat animals
+RepeatIsotopes<-subset(Isotopes,MainID %in% a)
+FemaleRepeatIsotopes<-subset(RepeatIsotopes,Sex=="Female")
+ID<-unique(FemaleRepeatIsotopes$MainID)
+b<-unique(FemaleRepeatIsotopes$MainID)
+
+##############################################################################
+#full datasets - no removal of individual datapoints (not pregnant, etc)
+##############################################################################
+##### Carbon
+rptC.rep1F<-rpt(d13C ~ Trip + (1 | MainID), grname = "MainID", data = FemaleRepeatIsotopes,
+                datatype = "Gaussian", 
+                nboot = 10000, npermut = 0)
+
+#print(rptC.rep1F)
+summary(rptC.rep1F)
+#plot(rptC.rep1F,cex.main=1)
+#Checking assumptions - code from Liz McHuron
+d13C.lmer<-lmer(d13C~ Trip+ (1|MainID), data=FemaleRepeatIsotopes) #Take ID Variance/Residual+ID
+Anova(d13C.lmer)
+plot(d13C.lmer) #maybe one outlier should check
+hist(resid(d13C.lmer))
+qqnorm(resid(d13C.lmer))
+plot(d13C.lmer, sqrt(abs(resid(.)))~fitted(.), type=c("p","smooth"))
+
+##### Nitrogen
+rptN.rep1F<-rpt(d15N ~ Trip + (1 | MainID), grname = "MainID", data = FemaleRepeatIsotopes, datatype = "Gaussian", 
+   nboot = 10000, npermut = 0)
+#print(rptN.rep1F)
+summary(rptN.rep1F)
+#plot(rptN.rep1F,cex.main=1)
+d15N.lmer<-lmer(d15N ~ Trip+ (1|MainID), data=FemaleRepeatIsotopes) #Take ID Variance/Residual+ID
+Anova(d15N.lmer)
+plot(d15N.lmer)
+hist(resid(d15N.lmer))
+qqnorm(resid(d15N.lmer))
+plot(d15N.lmer, sqrt(abs(resid(.)))~fitted(.), type=c("p","smooth"))
+```
+
+
+```{r}
+
+##### Individual female repeatability (Liz McHuron code)
+
+all<-lapply(FemaleRepeatIsotopes[,c(10:11)], 
+            function(x) lmer(x ~ Trip + (1|MainID),
+                             data=FemaleRepeatIsotopes)) #Take ID Variance/Residual+ID            
+summary(all$d13C)
+summary(all$d15N)
+
+#Extract residuals and calculate individual repeatability
+tempresid<-data.frame(lapply(all, residuals))
+tempresid$MainID<-FemaleRepeatIsotopes$MainID
+variance<-ddply(tempresid, "MainID", function(x){
+  apply(x, 2, var)})
+variance$MainID<-ID
+variance2<-data.table::melt(variance)
+
+temp<-lapply(all, VarCorr)
+temp.d13C <- data.frame(temp[["d13C"]])$vcov[1]
+temp.d15N <- data.frame(temp[["d15N"]])$vcov[1]
+
+temp.d13C.2 <- data.frame(matrix(NA, nrow = length(unique(FemaleRepeatIsotopes$MainID)), ncol= 2)) #Create an empty matrix
+temp.d15N.2 <- data.frame(matrix(NA, nrow = length(unique(FemaleRepeatIsotopes$MainID)), ncol= 2)) #Create an empty matrix
+
+colnames(temp.d13C.2) <- c('Variance','variable')
+colnames(temp.d15N.2) <- c('Variance','variable')
+
+temp.d13C.2$Variance <- temp.d13C
+temp.d13C.2$variable <- 'd13C'
+
+temp.d15N.2$Variance <- temp.d15N
+temp.d15N.2$variable <- 'd15N'
+
+temp2 <- rbind(temp.d13C.2,temp.d15N.2)
+
+
+indiR <-temp2
+indiR$MainID <-  variance2$MainID
+indiR$value <-  variance2$value
+
+indiR$indi<-indiR$Variance/(indiR$Variance+indiR$value) 
+
+#between individual variability / (between individual variability + residual variance for each individual)
+write.csv(indiR,file="../results/IndividualCN_Female_Repeatability.csv",row.names = F)
+summary(indiR$indi[indiR$variable=="d13C"])
+sd(indiR$indi[indiR$variable=="d13C"])
+length(indiR$indi[indiR$indi>0.75&indiR$variable=="d13C"])
+summary(indiR$indi[indiR$variable=="d15N"])
+sd(indiR$indi[indiR$variable=="d15N"])
+length(indiR$indi[indiR$indi>0.75&indiR$variable=="d15N"])
+```
+
+Create figures
+```{r}
+###### Individual repeatability
+indiR<-read.csv("../results/IndividualCN_Female_Repeatability.csv",T,sep=",",stringsAsFactors = F)
+a<-ggplot(indiR, aes(x=variable, y=indi))
+A<-a + geom_boxplot(width=0.6, size=1,coef=20)+
+  geom_point(pch=21,size=1.25,color="black",fill="gray80",position = position_jitter(w=0.04,h=0))+
+  theme_bw()+
+  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title=element_text(size=15),legend.key=element_blank(), 
+        legend.title=element_blank(), legend.position=c(0.78,0.80),
+        legend.text=element_text(size=15),
+        axis.title.y=element_text(vjust=1,size=15),
+        axis.text=element_text(size=15,color="black"),
+        axis.text.y=element_text(angle=90, hjust=0.5,size=15),
+        plot.title=element_text(face="bold"))+
+  scale_x_discrete(labels=c((expression(paste(""*delta^13*"C"))),expression(paste(""*delta^15*"N"))))+
+  scale_y_continuous(limits=c(0.30,1),breaks=seq(0.3,1,0.1),labels=c("",0.4,"",0.6,"",0.8,"","1.0"))+
+  ylab(expression(paste("Repeatability")))+
+  xlab(expression(paste("")))+
+  theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
+  theme(legend.key=element_rect(colour="white")) 
+
+print(A)
+
+ggsave(filename = "../figures/FemaleRepeatability.pdf",
+       plot = A,
+       device = cairo_pdf)
+
+tiff("../figures/FemaleRepeatability.tiff", width=4, height=4,units="in",res=300)
+grid.arrange(A, ncol=1,nrow=1)
+dev.off()
+```
+
+
+```{r}
+indiR2<-indiR[1:46,c(1,3:5)]
+colnames(indiR2)<-c("Variance.d13C","MainID","value.d13C","indi.d13C")
+indiR3<-indiR[47:96,c(1,3:5)]
+colnames(indiR3)<-c("Variance.d15N","MainID","value.d15N","indi.d15N")
+indiR4<-merge(indiR2,indiR3,by="MainID")
+rm(indiR2,indiR3)
+
+##############################################################################
+#reorganize data frame
+FemaleRepeatIsotopes<-FemaleRepeatIsotopes[order(FemaleRepeatIsotopes[,"ProcedureYear"]),] #order by sample year
+FemaleRepeatIsotopes2=NULL
+for(i in (b)){
+  print(i)
+  ind.seal<-FemaleRepeatIsotopes[FemaleRepeatIsotopes$MainID==i,]
+  ind.seal$SampleNumber=seq.int(nrow(ind.seal)) #gives a row number for each sample
+  FemaleRepeatIsotopes2<-rbind(FemaleRepeatIsotopes2,ind.seal)
+  rm(ind.seal)
+}
+unique(FemaleRepeatIsotopes2$SampleNumber)
+str(FemaleRepeatIsotopes2$SampleNumber)
+
+#add a column for 'abnormality' for abnormal years
+FemaleRepeatIsotopes2$AbnormalYear<-NA
+#PM14,15,16, PB14,15,16,17, PB2010,PM2010
+trips<-c("PM2010","PM2014","PM2015","PM2016","PB2010","PB2014","PB2015","PB2016","PB2017")
+FemaleRepeatIsotopes2$AbnormalYear[FemaleRepeatIsotopes2$UniqueTrip %in% trips]<-"abnormal"
+FemaleRepeatIsotopes2$AbnormalYear[FemaleRepeatIsotopes2$AbnormalYear!="abnormal"|is.na(FemaleRepeatIsotopes2$AbnormalYear)]<-"normal"
+unique(FemaleRepeatIsotopes2$AbnormalYear)
+
+FemaleRepeatSumm<-ddply(FemaleRepeatIsotopes2,c("MainID"),summarise,
+    n.samples=length(d13C),
+    n.complete.Track=sum(CompleteTrack,na.rm=T),
+    n.complete.TDR=sum(CompleteTDR,na.rm=T),
+    min.age=min(AgeDeploy,na.rm = T),
+    min.year=min(ProcedureYear),
+    max.year=max(ProcedureYear),
+    pct.change.in.std.length=(max(StandardLength_cm)-min(StandardLength_cm))/min(StandardLength_cm)*100,
+    sample.spread.years=max.year-min.year,
+    n.trip.types=length(unique(Trip)),
+    n.PM=length(d13C[Trip=="PostMolt"]),
+    n.PB=length(d13C[Trip=="PostBreeding"]),
+    n.abnormal.trips=length(d13C[AbnormalYear=="abnormal"]),
+    n.normal.trips=length(d13C[AbnormalYear=="normal"]),
+    mean.max.lat=mean(MaxLat_degrees,na.rm=T),
+    pct.diff.max.lat=(max(MaxLat_degrees,na.rm=T)-min(MaxLat_degrees,na.rm=T))/min(MaxLat_degrees,na.rm=T)*100,
+    mean.min.lon=mean(MinLon_degrees,na.rm=T),
+    pct.diff.min.lon=(max(MinLon_degrees,na.rm=T)-min(MinLon_degrees,na.rm=T))/min(MinLon_degrees,na.rm=T)*100,
+    
+    mean.prop.CAC=mean(MesoEcoProportionCAC,na.rm=T),
+    pct.diff.prop.CAC=(max(MesoEcoProportionCAC,na.rm=T)-min(MesoEcoProportionCAC,na.rm=T))/min(MesoEcoProportionCAC,na.rm=T)*100,
+    mean.prop.SubArc=mean(MesoEcoProportionSubArcticPac,na.rm=T),
+    pct.diff.prop.SubArc=(max(MesoEcoProportionSubArcticPac,na.rm=T)-min(MesoEcoProportionSubArcticPac,na.rm=T))/min(MesoEcoProportionSubArcticPac,na.rm=T)*100,
+    mean.prop.NCPac=mean(MesoEcoProportionNorthCPac,na.rm=T),
+    pct.diff.prop.NCPac=(max(MesoEcoProportionNorthCPac,na.rm=T)-min(MesoEcoProportionNorthCPac,na.rm=T))/min(MesoEcoProportionNorthCPac,na.rm=T)*100,
+    
+    mean.dist.shelf=mean(MedianDistToContShelf_km,na.rm=T),
+    pct.diff.dist.shelf=(max(MedianDistToContShelf_km,na.rm=T)-min(MedianDistToContShelf_km,na.rm=T))/min(MedianDistToContShelf_km,na.rm=T)*100,
+    mean.day.dives=mean(DeepDayForageDivesMedian_m,na.rm=T),
+    pct.diff.day.dives=(max(DeepDayForageDivesMedian_m,na.rm=T)-min(DeepDayForageDivesMedian_m,na.rm=T))/min(DeepDayForageDivesMedian_m,na.rm=T)*100,
+    mean.night.dives=mean(DeepDayForageDivesMedian_m,na.rm=T),
+    pct.diff.night.dives=(max(DeepNightForageDivesMedian_m,na.rm=T)-min(DeepNightForageDivesMedian_m,na.rm=T))/min(DeepNightForageDivesMedian_m,na.rm=T)*100)
+
+#make 3 factor to test based on the different trips
+FemaleRepeatSumm$TripFactor<-NA
+FemaleRepeatSumm$TripFactor[FemaleRepeatSumm$n.trip.types==2]<-"Combo.PM.PB"
+FemaleRepeatSumm$TripFactor[FemaleRepeatSumm$n.trip.types==1&FemaleRepeatSumm$n.PB>0]<-"Only.PB"
+FemaleRepeatSumm$TripFactor[FemaleRepeatSumm$n.trip.types==1&FemaleRepeatSumm$n.PM>0]<-"Only.PM"
+FemaleRepeatSumm$AbnormalFactor<-NA
+FemaleRepeatSumm$AbnormalFactor[FemaleRepeatSumm$n.abnormal.trips>0&FemaleRepeatSumm$n.normal.trips>0]<-"Combo.normal.abnormal"
+FemaleRepeatSumm$AbnormalFactor[FemaleRepeatSumm$n.abnormal.trips==0&FemaleRepeatSumm$n.normal.trips>0]<-"Only.normal.trips"
+FemaleRepeatSumm$AbnormalFactor[FemaleRepeatSumm$n.abnormal.trips>0&FemaleRepeatSumm$n.normal.trips==0]<-"Only.abnormal.trips"
+
+#fill in NA for seals with only 1 TDR record or Track for the pct diff
+FemaleRepeatSumm$pct.diff.max.lat[FemaleRepeatSumm$n.complete.Track<2]<-NA
+FemaleRepeatSumm$pct.diff.min.lon[FemaleRepeatSumm$n.complete.Track<2]<-NA
+FemaleRepeatSumm$pct.diff.dist.shelf[FemaleRepeatSumm$n.complete.Track<2]<-NA
+FemaleRepeatSumm$pct.diff.day.dives[FemaleRepeatSumm$n.complete.TDR<2]<-NA
+FemaleRepeatSumm$pct.diff.night.dives[FemaleRepeatSumm$n.complete.TDR<2]<-NA
+
+FemaleRepeatSumm$pct.diff.prop.CAC[FemaleRepeatSumm$n.complete.Track<2]<-NA
+FemaleRepeatSumm$pct.diff.prop.SubArc[FemaleRepeatSumm$n.complete.Track<2]<-NA
+FemaleRepeatSumm$pct.diff.prop.NCPac[FemaleRepeatSumm$n.complete.Track<2]<-NA
+
+indiR.merge<-merge(indiR4,FemaleRepeatSumm,by="MainID")
+write.csv(indiR.merge,file="../results/IndividualCN_Female_Repeatability_Wide_WithMetadata.csv",row.names = F)
+
+#go to 2021_Isotopes_RepeatFemales_Metadata
+#to run the stats on the individual repeatability in regards to diving/tracking/metadata in relation
+
+```
+
+Additional figures
+```{r}
+
+##############################################################################
+##############################################################################
+##############################################################################
+##############################################################################
+##############################################################################
+
+################################################################################################
+#Figure
+################################################################################################
+indiR.merge<-read.csv("../results/IndividualCN_Female_Repeatability_Wide_WithMetadata.csv",T,sep=",",stringsAsFactors = F)
+indiR.merge$sample.spread.years<-as.character(indiR.merge$sample.spread.years)
+indiR.merge$sample.spread.years<-factor(as.factor(indiR.merge$sample.spread.years),levels=c("0","1","2","3","4","6"))
+indiR.merge$n.trip.types<-as.character(indiR.merge$n.trip.types)
+
+b<-ggplot(indiR.merge, aes(x=indi.d13C, y=indi.d15N,fill=sample.spread.years,shape=n.trip.types))
+B<-b + geom_point(size=2.5,color="black")+
+  scale_fill_manual("Sample\nrange\n(years)",values=c("blue","lightblue","purple","yellow","orange","red"))+
+  scale_shape_manual("Trip types",values=c(21,24),labels=c("1 type","2 types"),guides(linetype='none'))+
+  guides(fill = guide_legend(override.aes = list(shape = 21)),
+         shape = guide_legend(override.aes = list(fill = "black")))+
+  geom_hline(yintercept = 0.75,lty=2,color="gray80")+
+  geom_vline(xintercept = 0.75,lty=2,color="gray80")+
+  theme_bw()+
+  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title=element_text(size=15),legend.key=element_blank(), 
+        legend.title=element_text(size=7,color="black"), legend.position=c(0.1,0.665),
+        legend.text=element_text(size=7),
+        legend.key.size = unit(0.75,'lines'),
+        legend.background = element_rect(fill='transparent'), #transparent legend bg
+        #legend.box.background = element_rect(fill='transparent'), #transparent legend panel
+        axis.title.y=element_text(vjust=1,size=15),
+        axis.text=element_text(size=15,color="black"),
+        axis.text.y=element_text(angle=90, hjust=0.5,size=15),
+        plot.title=element_text(face="bold"))+
+  scale_x_continuous(limits=c(0.30,1),breaks=seq(0.3,1,0.1),labels=c("",0.4,"",0.6,"",0.8,"","1.0"))+
+  scale_y_continuous(limits=c(0.30,1),breaks=seq(0.3,1,0.1),labels=c("",0.4,"",0.6,"",0.8,"","1.0"))+
+  xlab(expression(paste("Repeatability "*delta^13*"C")))+
+  ylab(expression(paste("Repeatability "*delta^15*"N")))+
+  theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
+  theme(legend.key=element_rect(colour="transparent",fill="transparent")) 
+B
+
+ggsave(filename = "../figures/FemaleCNRepeatability_MaxYearsBetweenSamplesAndTripType.pdf",
+       plot = B,
+       device = cairo_pdf)
+
+tiff("../figures/FemaleCNRepeatability_MaxYearsBetweenSamplesAndTripType.tiff", width=4, height=4,units="in",res=300)
+grid.arrange(B, ncol=1,nrow=1)
+dev.off()
+```
