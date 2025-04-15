@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-This code was originally written by Sarah Peterson and edited as a R Markdown document by Luis Hukstadt for the publication
+This code was originally written by Sarah Peterson and edited as a R Markdown document by Luis Huckstadt for the publication
 
 Load the libraries and import the  data
 ```{r}
@@ -20,17 +20,31 @@ library(car)
 library(afex)
 library(ggpubr)
 library(predictmeans)
+library(gridExtra)
 
-#read in the master file from the google drive folder
-HgPOPs<-read.csv("/Users/sarahpeterson23/Sarahs_Google_Drive/Eseal_Isotopes/EsealHgPOPs_Master.csv",T,sep=",",stringsAsFactors = F)
-head(HgPOPs)
+#read in the master file with the data
+data_iso <- read.csv('../data/EsealHGPOPs_Master.csv')
+
+col2keep <- c('TOPPID','TimePeriod','MasterID','MainID','animalID','Trip','Sex',
+              'ProcedureYear','CompleteTrack','d13C',	'd15N','CompleteTDR',
+              'StandardLength_cm','ProcedureDate','AgeDeploy','MaxLat_degrees',
+              'MinLon_degrees','MesoEcoProportionCAC','MesoEcoProportionSubArcticPac',
+              'MesoEcoProportionNorthCPac','MedianDistToContShelf_km',
+              'DeepDayForageDivesMedian_m','DeepNightForageDivesMedian_m',
+              "Mass_Procedure_kg","AxGirth_cm","CurveLength_cm","ProcedureDate")
+
+
+data_iso <- data_iso[,col2keep] 
+
 #subset to just seals that have isotope data at arrival (no San Nic seals)
 #includes ONLY seals at arrivel (and not after fasting) and only the seals that have been
 #vetted for the isotopes paper (removes just a handful of seals for a variety of reasons)
-Isotopes<-subset(HgPOPs,!is.na(d13C)&TimePeriod=="Arrival"&(MainID!="RG180"&MainID!="RG182"
-  &MainID!="RG184"&MainID!="RG185"&MainID!="RG187"&MainID!="RG191")&ForIsotopesPaper=="Yes")
+Isotopes<-subset(data_iso,!is.na(d13C)&TimePeriod=="Arrival"&(MainID!="RG180"&MainID!="RG182"
+  &MainID!="RG184"&MainID!="RG185"&MainID!="RG187"&MainID!="RG191"))
+
 #total 304 samples
-length(unique(Isotopes$animalID)) #from 236 unique seals
+length(unique(Isotopes$animalID)) #from 304 unique seals, males and females (236 females)
+rm(data_iso)
 ```
 
 Identify repeat seals
@@ -41,6 +55,7 @@ summ.count.seals<-ddply(Isotopes,c("MainID","Sex"),summarise,
   n.samples=length(d13C))
 summ.count.seals.repeat<-subset(summ.count.seals,n.samples>1)
 a<-unique(summ.count.seals.repeat$MainID)
+
 #subset Isotopes dataset into just repeat animals
 RepeatIsotopes<-subset(Isotopes,MainID %in% a)
 FemaleRepeatIsotopes<-subset(RepeatIsotopes,Sex=="Female")
@@ -51,8 +66,10 @@ b<-unique(FemaleRepeatIsotopes$MainID)
 #full datasets - no removal of individual datapoints (not pregnant, etc)
 ##############################################################################
 ##### Carbon
-rptC.rep1F<-rpt(d13C ~ Trip + (1 | MainID), grname = "MainID", data = FemaleRepeatIsotopes, datatype = "Gaussian", 
-   nboot = 1000, npermut = 0)
+rptC.rep1F<-rpt(d13C ~ Trip + (1 | MainID), grname = "MainID", data = FemaleRepeatIsotopes,
+                datatype = "Gaussian", 
+                nboot = 10000, npermut = 0)
+
 #print(rptC.rep1F)
 summary(rptC.rep1F)
 #plot(rptC.rep1F,cex.main=1)
@@ -66,7 +83,7 @@ plot(d13C.lmer, sqrt(abs(resid(.)))~fitted(.), type=c("p","smooth"))
 
 ##### Nitrogen
 rptN.rep1F<-rpt(d15N ~ Trip + (1 | MainID), grname = "MainID", data = FemaleRepeatIsotopes, datatype = "Gaussian", 
-   nboot = 1000, npermut = 0)
+   nboot = 10000, npermut = 0)
 #print(rptN.rep1F)
 summary(rptN.rep1F)
 #plot(rptN.rep1F,cex.main=1)
@@ -76,27 +93,50 @@ plot(d15N.lmer)
 hist(resid(d15N.lmer))
 qqnorm(resid(d15N.lmer))
 plot(d15N.lmer, sqrt(abs(resid(.)))~fitted(.), type=c("p","smooth"))
+```
 
+
+```{r}
 
 ##### Individual female repeatability (Liz McHuron code)
 
-all<-lapply(FemaleRepeatIsotopes[,c(113:114)], function(x) lmer(x ~ Trip + (1|MainID), data=FemaleRepeatIsotopes)) #Take ID Variance/Residual+ID            
+all<-lapply(FemaleRepeatIsotopes[,c(10:11)], 
+            function(x) lmer(x ~ Trip + (1|MainID),
+                             data=FemaleRepeatIsotopes)) #Take ID Variance/Residual+ID            
 summary(all$d13C)
 summary(all$d15N)
-#Extract residuals and calculate individual repeatability
-temp<-lapply(all, VarCorr)
-temp2<-melt(temp)
-temp3<-temp2[seq(1, nrow(temp2), by=2),c(4,6)]
-colnames(temp3)<-c("Variance", "variable")
 
+#Extract residuals and calculate individual repeatability
 tempresid<-data.frame(lapply(all, residuals))
 tempresid$MainID<-FemaleRepeatIsotopes$MainID
 variance<-ddply(tempresid, "MainID", function(x){
   apply(x, 2, var)})
 variance$MainID<-ID
-variance2<-melt(variance)
+variance2<-data.table::melt(variance)
 
-indiR<-join(temp3, variance2, by="variable", match="all")
+temp<-lapply(all, VarCorr)
+temp.d13C <- data.frame(temp[["d13C"]])$vcov[1]
+temp.d15N <- data.frame(temp[["d15N"]])$vcov[1]
+
+temp.d13C.2 <- data.frame(matrix(NA, nrow = length(unique(FemaleRepeatIsotopes$MainID)), ncol= 2)) #Create an empty matrix
+temp.d15N.2 <- data.frame(matrix(NA, nrow = length(unique(FemaleRepeatIsotopes$MainID)), ncol= 2)) #Create an empty matrix
+
+colnames(temp.d13C.2) <- c('Variance','variable')
+colnames(temp.d15N.2) <- c('Variance','variable')
+
+temp.d13C.2$Variance <- temp.d13C
+temp.d13C.2$variable <- 'd13C'
+
+temp.d15N.2$Variance <- temp.d15N
+temp.d15N.2$variable <- 'd15N'
+
+temp2 <- rbind(temp.d13C.2,temp.d15N.2)
+
+
+indiR <-temp2
+indiR$MainID <-  variance2$MainID
+indiR$value <-  variance2$value
+
 indiR$indi<-indiR$Variance/(indiR$Variance+indiR$value) 
 
 #between individual variability / (between individual variability + residual variance for each individual)
@@ -131,6 +171,11 @@ A<-a + geom_boxplot(width=0.6, size=1,coef=20)+
   theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
   theme(legend.key=element_rect(colour="white")) 
 
+print(A)
+
+ggsave(filename = "../figures/FemaleRepeatability.pdf",
+       plot = A,
+       device = cairo_pdf)
 
 tiff("../figures/FemaleRepeatability.tiff", width=4, height=4,units="in",res=300)
 grid.arrange(A, ncol=1,nrow=1)
@@ -160,26 +205,19 @@ for(i in (b)){
 unique(FemaleRepeatIsotopes2$SampleNumber)
 str(FemaleRepeatIsotopes2$SampleNumber)
 
-FemaleRepeatIsotopes3<-FemaleRepeatIsotopes2[,c("MainID","UniqueTrip","animalID","MasterID","TimePeriod",
-    "d13C","d15N","Mass_Procedure_kg","StandardLength_cm","AxGirth_cm","CurveLength_cm",
-    "Age","AgeRecoveryEB","BirthYear","ProcedureYear","ProcedureDate","SampleNumber","Trip","CompleteTrack",
-    "CompleteTDR","MaxLat_degrees","MinLon_degrees","MedianDistToContShelf_km",
-    "MesoEcoProportionShelf","MesoEcoProportionCAC","MesoEcoProportionSubArcticPac",
-    "MesoEcoProportionNorthCPac","Pct_BenthicDives","DeepDayForageDivesMedian_m",
-    "DeepNightForageDivesMedian_m")]
 #add a column for 'abnormality' for abnormal years
-FemaleRepeatIsotopes3$AbnormalYear<-NA
+FemaleRepeatIsotopes2$AbnormalYear<-NA
 #PM14,15,16, PB14,15,16,17, PB2010,PM2010
 trips<-c("PM2010","PM2014","PM2015","PM2016","PB2010","PB2014","PB2015","PB2016","PB2017")
-FemaleRepeatIsotopes3$AbnormalYear[FemaleRepeatIsotopes3$UniqueTrip %in% trips]<-"abnormal"
-FemaleRepeatIsotopes3$AbnormalYear[FemaleRepeatIsotopes3$AbnormalYear!="abnormal"|is.na(FemaleRepeatIsotopes3$AbnormalYear)]<-"normal"
-unique(FemaleRepeatIsotopes3$AbnormalYear)
+FemaleRepeatIsotopes2$AbnormalYear[FemaleRepeatIsotopes2$UniqueTrip %in% trips]<-"abnormal"
+FemaleRepeatIsotopes2$AbnormalYear[FemaleRepeatIsotopes2$AbnormalYear!="abnormal"|is.na(FemaleRepeatIsotopes2$AbnormalYear)]<-"normal"
+unique(FemaleRepeatIsotopes2$AbnormalYear)
 
-FemaleRepeatSumm<-ddply(FemaleRepeatIsotopes3,c("MainID"),summarise,
+FemaleRepeatSumm<-ddply(FemaleRepeatIsotopes2,c("MainID"),summarise,
     n.samples=length(d13C),
     n.complete.Track=sum(CompleteTrack,na.rm=T),
     n.complete.TDR=sum(CompleteTDR,na.rm=T),
-    min.age=min(AgeRecoveryEB,na.rm = T),
+    min.age=min(AgeDeploy,na.rm = T),
     min.year=min(ProcedureYear),
     max.year=max(ProcedureYear),
     pct.change.in.std.length=(max(StandardLength_cm)-min(StandardLength_cm))/min(StandardLength_cm)*100,
@@ -280,428 +318,12 @@ B<-b + geom_point(size=2.5,color="black")+
   theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
   theme(legend.key=element_rect(colour="transparent",fill="transparent")) 
 B
+
+ggsave(filename = "../figures/FemaleCNRepeatability_MaxYearsBetweenSamplesAndTripType.pdf",
+       plot = B,
+       device = cairo_pdf)
+
 tiff("../figures/FemaleCNRepeatability_MaxYearsBetweenSamplesAndTripType.tiff", width=4, height=4,units="in",res=300)
 grid.arrange(B, ncol=1,nrow=1)
 dev.off()
-
-##############################################################################
-#reduced female dataset
-##############################################################################
-# RepeatIsotopes.Reduced<-subset(RepeatIsotopes,MainID!="O651"&MainID!="T740"&TOPPID!="2007044"&TOPPID!="2010063")
-# FemaleRepeatIsotopes.Reduced<-subset(RepeatIsotopes.Reduced,Sex=="Female")
-# #removed O651 (1 non pregnant PM), remove T740 (1 non pregnant PM), removed non-pregnant S105, removed non-pregnant WX311
-# rptC.rep2F<-rpt(d13C ~ (1 | animalID), grname = "animalID", data = FemaleRepeatIsotopes.Reduced, datatype = "Gaussian", 
-#    nboot = 1000, npermut = 0)
-# summary(rptC.rep2F)
-# rptN.rep2F<-rpt(d15N ~ (1 | animalID), grname = "animalID", data = FemaleRepeatIsotopes.Reduced, datatype = "Gaussian", 
-#    nboot = 1000, npermut = 0)
-# summary(rptN.rep2F)
-
-
-
-
-
-
-##############################################################################
-##############################################################################
-##############################################################################
-##############################################################################
-##############################################################################
-#additional reshaping of the dataset
-x1<-subset(FemaleRepeatIsotopes3,SampleNumber==1)
-x2<-subset(FemaleRepeatIsotopes3,SampleNumber==2)
-x2<-x2[,c("MainID","d13C","d15N","Mass_Procedure_kg","StandardLength_cm","AxGirth_cm","CurveLength_cm","ProcedureYear","ProcedureDate","SampleNumber","Trip")]
-colnames(x2)[2]<-"RepeatSample_d13C"
-colnames(x2)[3]<-"RepeatSample_d15N"
-colnames(x2)[4]<-"RepeatSample_Mass_Procedure_kg"
-colnames(x2)[5]<-"RepeatSample_StandardLength_cm"
-colnames(x2)[6]<-"RepeatSample_AxGirth_cm"
-colnames(x2)[7]<-"RepeatSample_CurveLength_cm"
-colnames(x2)[8]<-"RepeatSample_ProcedureYear"
-colnames(x2)[9]<-"RepeatSample_ProcedureDate"
-colnames(x2)[10]<-"RepeatSample_SampleNumber"
-colnames(x2)[11]<-"RepeatSample_Trip"
-x3<-subset(FemaleRepeatIsotopes3,SampleNumber==3)
-x3<-x3[,c("MainID","d13C","d15N","Mass_Procedure_kg","StandardLength_cm","AxGirth_cm","CurveLength_cm","ProcedureYear","ProcedureDate","SampleNumber","Trip")]
-colnames(x3)[2]<-"RepeatSample_d13C"
-colnames(x3)[3]<-"RepeatSample_d15N"
-colnames(x3)[4]<-"RepeatSample_Mass_Procedure_kg"
-colnames(x3)[5]<-"RepeatSample_StandardLength_cm"
-colnames(x3)[6]<-"RepeatSample_AxGirth_cm"
-colnames(x3)[7]<-"RepeatSample_CurveLength_cm"
-colnames(x3)[8]<-"RepeatSample_ProcedureYear"
-colnames(x3)[9]<-"RepeatSample_ProcedureDate"
-colnames(x3)[10]<-"RepeatSample_SampleNumber"
-colnames(x3)[11]<-"RepeatSample_Trip"
-x4<-subset(FemaleRepeatIsotopes3,SampleNumber==4)
-x4<-x4[,c("MainID","d13C","d15N","Mass_Procedure_kg","StandardLength_cm","AxGirth_cm","CurveLength_cm","ProcedureYear","ProcedureDate","SampleNumber","Trip")]
-colnames(x4)[2]<-"RepeatSample_d13C"
-colnames(x4)[3]<-"RepeatSample_d15N"
-colnames(x4)[4]<-"RepeatSample_Mass_Procedure_kg"
-colnames(x4)[5]<-"RepeatSample_StandardLength_cm"
-colnames(x4)[6]<-"RepeatSample_AxGirth_cm"
-colnames(x4)[7]<-"RepeatSample_CurveLength_cm"
-colnames(x4)[8]<-"RepeatSample_ProcedureYear"
-colnames(x4)[9]<-"RepeatSample_ProcedureDate"
-colnames(x4)[10]<-"RepeatSample_SampleNumber"
-colnames(x4)[11]<-"RepeatSample_Trip"
-
-x2m<-merge(x1,x2,all.x=T,all.y=T,by="MainID")
-x3m<-merge(x1,x3,all.x=F,all.y=T,by="MainID")
-x4m<-merge(x1,x4,all.x=F,all.y=T,by="MainID")
-FemaleRepeatIsotopes3<-rbind(x2m,x3m,x4m)
-unique(FemaleRepeatIsotopes3$RepeatSample_SampleNumber)
-unique(FemaleRepeatIsotopes3$RepeatSample_Trip)
-
-FemaleRepeatIsotopes3$Category[FemaleRepeatIsotopes3$Trip=="PostMolt"&FemaleRepeatIsotopes3$RepeatSample_Trip=="PostMolt"]<-"PostMolt"
-FemaleRepeatIsotopes3$Category[FemaleRepeatIsotopes3$Trip=="PostBreeding"&FemaleRepeatIsotopes3$RepeatSample_Trip=="PostBreeding"]<-"PostBreeding"
-FemaleRepeatIsotopes3$Category[FemaleRepeatIsotopes3$Trip=="PostBreeding"&FemaleRepeatIsotopes3$RepeatSample_Trip=="PostMolt"]<-"Mixed: PB first"
-FemaleRepeatIsotopes3$Category[FemaleRepeatIsotopes3$Trip=="PostMolt"&FemaleRepeatIsotopes3$RepeatSample_Trip=="PostBreeding"]<-"Mixed: PM first"
-
-#############################################################
-c<-ggplot(FemaleRepeatIsotopes3, aes(x=d13C, y=RepeatSample_d13C)) #subset(summ.fem,n.pups>2) #fill=Category
-C<-c + geom_point(pch=21,size=2.5,color="black",fill="gray80")+
-  #scale_fill_manual(values=c("red","blue","gray25","gray75"),labels=c("PM pair","PB pair","Mixed: PB first","Mixed: PM first"))+
-  geom_segment(aes(y=-20.1,yend=-18.4, x=-20.1,xend=-18.4),color="gray80",lty=1,lwd=0.5)+
-  theme_bw()+
-  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title=element_text(size=15), 
-        legend.title=element_blank(), legend.position="none",
-        #legend.text=element_text(size=10),
-        legend.key.size = unit(0.7, 'lines'),
-        axis.title.y=element_text(vjust=1,color="black",size=15),
-        axis.text=element_text(size=15,color="black"),
-        axis.text.y=element_text(angle=90, hjust=0.5,color="black",size=15),
-        plot.title=element_text(face="bold"))+
-  scale_x_continuous(limits=c(-20.1,-18.4),breaks=seq(-20,-18.5,0.25),labels=c(-20.0,"",-19.5,"",-19.0,"",18.5),expand = c(0,0))+
-  scale_y_continuous(limits=c(-20.1,-18.4),breaks=seq(-20,-18.5,0.25),labels=c(-20.0,"",-19.5,"",-19.0,"",18.5),expand = c(0,0))+
-  xlab(expression(paste("First "*delta^13*"C (\u2030)")))+
-  ylab(expression(paste("Subsequent "*delta^13*"C (\u2030)")))+
-  #annotate("text", x = 10, y = 0.40, label = "italic(R^2)== 0.60", parse = TRUE, hjust = 0)+
-  theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
-  theme(legend.key=element_rect(colour="white")) 
-
-n<-ggplot(FemaleRepeatIsotopes3, aes(x=d15N, y=RepeatSample_d15N)) #subset(summ.fem,n.pups>2)
-N<-n + geom_point(pch=21,size=2.5,color="black",fill="gray80")+
-  #scale_fill_manual(values=c("red","blue","gray25","gray75"),labels=c("PM pair","PB pair","Mixed: PB first","Mixed: PM first"))+
-  geom_segment(aes(y=13.25,yend=17.3, x=13.25,xend=17.3),color="gray80",lty=1,lwd=0.5)+
-  theme_bw()+
-  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title=element_text(size=15), 
-        legend.title=element_blank(), legend.position="none",
-        #legend.text=element_text(size=10),
-        axis.title.y=element_text(vjust=1,color="black",size=15),
-        axis.text=element_text(size=15,color="black"),
-        axis.text.y=element_text(angle=90, hjust=0.5,color="black",size=15),
-        plot.title=element_text(face="bold"))+
-  scale_x_continuous(limits=c(13.25,17.3),breaks=seq(13.5,17,0.5),labels=c("",14,"",15,"",16,"",17),expand = c(0,0))+
-  scale_y_continuous(limits=c(13.25,17.3),breaks=seq(13.5,17,0.5),labels=c("",14,"",15,"",16,"",17),expand = c(0,0))+
-  xlab(expression(paste("First "*delta^15*"N (\u2030)")))+
-  ylab(expression(paste("Subsequent "*delta^15*"N (\u2030)")))+
-  #annotate("text", x = 10, y = 0.40, label = "italic(R^2)== 0.60", parse = TRUE, hjust = 0)+
-  theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
-  theme(legend.key=element_rect(colour="white")) 
-
-tiff("../figures/RepeatFemalesSeasonsTogether.tiff", width=8, height=4,units="in",res=300,compression="lzw", type="cairo")
-grid.arrange(C,N, ncol=2,nrow=1)
-dev.off()
-
-tiff("../figures/RepeatFemalesSeasonsTogetherWithRepeatability.tiff", width=8, height=8,units="in",res=300,compression="lzw", type="cairo")
-ggarrange(A,B,C,N, ncol=2,nrow=2,align=c("hv"))
-dev.off()
-
-jpeg("../figure/RepeatFemalesSeasonsTogetherWithRepeatability.jpeg", width=8, height=8,units="in",res=300)
-ggarrange(A,B,C,N, ncol=2,nrow=2,align=c("hv"))
-dev.off()
-
-
-##############################################################################
-##############################################################################
-summ.count.seals<-ddply(Isotopes,c("MainID","Sex"),summarise,
-  n.samples=length(d13C),
-  min.d13C=min(d13C),
-  max.d13C=max(d13C),
-  mean.d13C=round(mean(d13C),digits=2),
-  sd.d13C=round(sd(d13C),digits=2),
-  min.d15N=min(d15N),
-  max.d15N=max(d15N),
-  mean.d15N=round(mean(d15N),digits=2),
-  sd.d15N=round(sd(d15N),digits=2),
-  n.samples.PM=length(d13C[Trip=="PostMolt"]),
-  min.d13C.PM=min(d13C[Trip=="PostMolt"]),
-  max.d13C.PM=max(d13C[Trip=="PostMolt"]),
-  mean.d13C.PM=round(mean(d13C[Trip=="PostMolt"]),digits=2),
-  sd.d13C.PM=round(sd(d13C[Trip=="PostMolt"]),digits=2),
-  min.d15N.PM=min(d15N[Trip=="PostMolt"]),
-  max.d15N.PM=max(d15N[Trip=="PostMolt"]),
-  mean.d15N.PM=round(mean(d15N[Trip=="PostMolt"]),digits=2),
-  sd.d15N.PM=round(sd(d15N[Trip=="PostMolt"]),digits=2),
-  n.samples.PB=length(d13C[Trip=="PostBreeding"]),
-  min.d13C.PB=min(d13C[Trip=="PostBreeding"]),
-  max.d13C.PB=max(d13C[Trip=="PostBreeding"]),
-  mean.d13C.PB=round(mean(d13C[Trip=="PostBreeding"]),digits=2),
-  sd.d13C.PB=round(sd(d13C[Trip=="PostBreeding"]),digits=2),
-  min.d15N.PB=min(d15N[Trip=="PostBreeding"]),
-  max.d15N.PB=max(d15N[Trip=="PostBreeding"]),
-  mean.d15N.PB=round(mean(d15N[Trip=="PostBreeding"]),digits=2),
-  sd.d15N.PB=round(sd(d15N[Trip=="PostBreeding"]),digits=2))
-summ.count.seals<-subset(summ.count.seals,n.samples>1)
-summ.count.seals$min.d13C[summ.count.seals$min.d13C=="Inf"]<-NA
-summ.count.seals$min.d13C.PM[summ.count.seals$min.d13C.PM=="Inf"]<-NA
-summ.count.seals$min.d13C.PB[summ.count.seals$min.d13C.PB=="Inf"]<-NA
-summ.count.seals$max.d13C[summ.count.seals$max.d13C=="-Inf"]<-NA
-summ.count.seals$max.d13C.PM[summ.count.seals$max.d13C.PM=="-Inf"]<-NA
-summ.count.seals$max.d13C.PB[summ.count.seals$max.d13C.PB=="-Inf"]<-NA
-summ.count.seals$min.d15N[summ.count.seals$min.d15N=="Inf"]<-NA
-summ.count.seals$min.d15N.PM[summ.count.seals$min.d15N.PM=="Inf"]<-NA
-summ.count.seals$min.d15N.PB[summ.count.seals$min.d15N.PB=="Inf"]<-NA
-summ.count.seals$max.d15N[summ.count.seals$max.d15N=="-Inf"]<-NA
-summ.count.seals$max.d15N.PM[summ.count.seals$max.d15N.PM=="-Inf"]<-NA
-summ.count.seals$max.d15N.PB[summ.count.seals$max.d15N.PB=="-Inf"]<-NA
-summ.count.seals$mean.d13C.PM[summ.count.seals$mean.d13C.PM=="NaN"]<-NA
-summ.count.seals$mean.d15N.PM[summ.count.seals$mean.d15N.PM=="NaN"]<-NA
-summ.count.seals$mean.d13C.PB[summ.count.seals$mean.d13C.PB=="NaN"]<-NA
-summ.count.seals$mean.d15N.PB[summ.count.seals$mean.d15N.PB=="NaN"]<-NA
-#turn numbers into character
-summ.count.seals$n.samples<-as.character(summ.count.seals$n.samples)
-summ.count.seals$n.samples.PM<-as.character(summ.count.seals$n.samples.PM)
-summ.count.seals$n.samples.PB<-as.character(summ.count.seals$n.samples.PB)
-summ.count.seals$n.samples.PB.2<-paste(summ.count.seals$Sex,summ.count.seals$n.samples.PB,sep=" ")
-summ.count.seals$n.samples.PM.2<-paste(summ.count.seals$Sex,summ.count.seals$n.samples.PM,sep=" ")
-
-a<-ggplot(subset(summ.count.seals,n.samples.PM>1), aes(x=min.d13C.PM, y=max.d13C.PM,fill=n.samples.PM.2,shape=n.samples.PM.2))
-A<-a + geom_point(size=3,color="black")+
-  scale_fill_manual(values=c("gray75","white","gray75"),labels=c("Female: 2 isotope samples","Female: 3 isotope samples","Male: 2 isotope samples"))+
-  scale_shape_manual(values=c(21,21,24),labels=c("Female: 2 isotope samples","Female: 3 isotope samples","Male: 2 isotope samples"))+
-  geom_segment(aes(y=-20.25,yend=-15.75, x=-20.25,xend=-15.75),color="gray75",lty=2,lwd=1)+
-  theme_bw()+
-  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title=element_text(size=12), 
-        legend.title=element_blank(), legend.position=c(0.32,0.84),
-        legend.text=element_text(size=10),
-        axis.title.y=element_text(vjust=1,color="black"),
-        axis.text=element_text(size=12,color="black"),
-        axis.text.y=element_text(angle=90, hjust=0.5,color="black"),
-        plot.title=element_text(face="bold",hjust=0.5))+
-  scale_x_continuous(limits=c(-20.25,-15.75),breaks=seq(-20.25,-16,0.25),labels=c("",-20.0,"","","",-19.0,"","","",-18,"","","",-17,"","","",-16),expand = c(0,0))+
-  scale_y_continuous(limits=c(-20.25,-15.75),breaks=seq(-20.25,-16,0.25),labels=c("",-20.0,"","","",-19.0,"","","",-18,"","","",-17,"","","",-16),expand = c(0,0))+
-  xlab(expression(paste("Minimum "*delta^13*"C (\u2030)")))+
-  ylab(expression(paste("Maximum "*delta^13*"C (\u2030)")))+
-  ggtitle("Post molting")+
-  #annotate("text", x = 10, y = 0.40, label = "italic(R^2)== 0.60", parse = TRUE, hjust = 0)+
-  theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
-  theme(legend.key=element_rect(colour="white")) 
-
-b<-ggplot(subset(summ.count.seals,n.samples.PB>1), aes(x=min.d13C.PB, y=max.d13C.PB,fill=n.samples.PB.2,shape=n.samples.PB.2))
-B<-b + geom_point(size=3,color="black")+
-  scale_fill_manual(values=c("gray75","gray75"),labels=c("Female: 2 isotope samples","Male: 2 isotope samples"))+
-  scale_shape_manual(values=c(21,24),labels=c("Female: 2 isotope samples","Male: 2 isotope samples"))+
-  geom_segment(aes(y=-20.25,yend=-15.75, x=-20.25,xend=-15.75),color="gray75",lty=2,lwd=1)+
-  theme_bw()+
-  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title=element_text(size=12), 
-        legend.title=element_blank(), legend.position="none",
-        legend.text=element_text(size=10),
-        axis.title.y=element_text(vjust=1,color="black"),
-        axis.text=element_text(size=12,color="black"),
-        axis.text.y=element_text(angle=90, hjust=0.5,color="black"),
-        plot.title=element_text(face="bold",hjust=0.5))+
-  scale_x_continuous(limits=c(-20.25,-15.75),breaks=seq(-20.25,-16,0.25),labels=c("",-20.0,"","","",-19.0,"","","",-18,"","","",-17,"","","",-16),expand = c(0,0))+
-  scale_y_continuous(limits=c(-20.25,-15.75),breaks=seq(-20.25,-16,0.25),labels=c("",-20.0,"","","",-19.0,"","","",-18,"","","",-17,"","","",-16),expand = c(0,0))+
-  xlab(expression(paste("Minimum "*delta^13*"C (\u2030)")))+
-  ylab(expression(paste("Maximum "*delta^13*"C (\u2030)")))+
-  ggtitle("Post breeding")+
-  #annotate("text", x = 10, y = 0.40, label = "italic(R^2)== 0.60", parse = TRUE, hjust = 0)+
-  theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
-  theme(legend.key=element_rect(colour="white")) 
-
-c<-ggplot(subset(summ.count.seals,n.samples.PM>1), aes(x=min.d15N.PM, y=max.d15N.PM,fill=n.samples.PM.2,shape=n.samples.PM.2))
-C<-c + geom_point(size=3,color="black")+
-  scale_fill_manual(values=c("gray75","white","gray75"),labels=c("Female: 2 isotope samples","Female: 3 isotope samples","Male: 2 isotope samples"))+
-  scale_shape_manual(values=c(21,21,24),labels=c("Female: 2 isotope samples","Female: 3 isotope samples","Male: 2 isotope samples"))+
-  geom_segment(aes(y=13.25,yend=17.3,x=13.25,xend=17.3),color="gray75",lty=2,lwd=1)+
-  theme_bw()+
-  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title=element_text(size=12), 
-        legend.title=element_blank(), legend.position="none",
-        legend.text=element_text(size=10),
-        axis.title.y=element_text(vjust=1,color="black"),
-        axis.text=element_text(size=12,color="black"),
-        axis.text.y=element_text(angle=90, hjust=0.5,color="black"),
-        plot.title=element_text(face="bold",hjust=0.5))+
-  scale_x_continuous(limits=c(13.25,17.3),breaks=seq(13.5,17,0.5),labels=c("",14,"",15,"",16,"",17),expand = c(0,0))+
-  scale_y_continuous(limits=c(13.25,17.3),breaks=seq(13.5,17,0.5),labels=c("",14,"",15,"",16,"",17),expand = c(0,0))+
-  xlab(expression(paste("Minimum "*delta^15*"N (\u2030)")))+
-  ylab(expression(paste("Maximum "*delta^15*"N (\u2030)")))+
-  ggtitle("Post molting")+
-  #annotate("text", x = 10, y = 0.40, label = "italic(R^2)== 0.60", parse = TRUE, hjust = 0)+
-  theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
-  theme(legend.key=element_rect(colour="white")) 
-
-d<-ggplot(subset(summ.count.seals,n.samples.PB>1), aes(x=min.d15N.PB, y=max.d15N.PB,fill=n.samples.PB.2,shape=n.samples.PB.2))
-D<-d + geom_point(size=3,color="black")+
-  scale_fill_manual(values=c("gray75","gray75"),labels=c("Female: 2 isotope samples","Male: 2 isotope samples"))+
-  scale_shape_manual(values=c(21,24),labels=c("Female: 2 isotope samples","Male: 2 isotope samples"))+
-  geom_segment(aes(y=13.25,yend=17.3,x=13.25,xend=17.3),color="gray75",lty=2,lwd=1)+
-  theme_bw()+
-  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title=element_text(size=12), 
-        legend.title=element_blank(), legend.position="none",
-        legend.text=element_text(size=10),
-        axis.title.y=element_text(vjust=1,color="black"),
-        axis.text=element_text(size=12,color="black"),
-        axis.text.y=element_text(angle=90, hjust=0.5,color="black"),
-        plot.title=element_text(face="bold",hjust=0.5))+
-  scale_x_continuous(limits=c(13.25,17.3),breaks=seq(13.5,17,0.5),labels=c("",14,"",15,"",16,"",17),expand = c(0,0))+
-  scale_y_continuous(limits=c(13.25,17.3),breaks=seq(13.5,17,0.5),labels=c("",14,"",15,"",16,"",17),expand = c(0,0))+
-  xlab(expression(paste("Minimum "*delta^15*"N (\u2030)")))+
-  ylab(expression(paste("Maximum "*delta^15*"N (\u2030)")))+
-  ggtitle("Post breeding")+
-  #annotate("text", x = 10, y = 0.40, label = "italic(R^2)== 0.60", parse = TRUE, hjust = 0)+
-  theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
-  theme(legend.key=element_rect(colour="white")) 
-
-tiff("../figures/RepeatSeals.tiff", width=8, height=8,units="in",res=300,compression="lzw", type="cairo")
-grid.arrange(A,B,C,D, ncol=2,nrow=2)
-dev.off()
-
-
-#############################################################
-aa<-ggplot(subset(summ.count.seals,n.samples.PM>1&Sex=="Female"), aes(x=min.d13C.PM, y=max.d13C.PM,fill=n.samples.PM.2,shape=n.samples.PM.2))
-AA<-aa + geom_point(size=3,color="black")+
-  scale_fill_manual(values=c("gray75","white"),labels=c("Female: 2 samples","Female: 3 samples"))+
-  scale_shape_manual(values=c(21,21),labels=c("Female: 2 samples","Female: 3 samples"))+
-  geom_segment(aes(y=-20,yend=-18.5, x=-20,xend=-18.5),color="gray75",lty=2,lwd=1)+
-  theme_bw()+
-  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title=element_text(size=12), 
-        legend.title=element_blank(), legend.position=c(0.285,0.88),
-        legend.text=element_text(size=10),
-        axis.title.y=element_text(vjust=1,color="black"),
-        axis.text=element_text(size=12,color="black"),
-        axis.text.y=element_text(angle=90, hjust=0.5,color="black"),
-        plot.title=element_text(face="bold",hjust=0.5))+
-  scale_x_continuous(limits=c(-20,-18.5),breaks=seq(-20,-18.5,0.25),labels=c(-20.0,"",-19.5,"",-19.0,"",""),expand = c(0,0))+
-  scale_y_continuous(limits=c(-20,-18.5),breaks=seq(-20,-18.5,0.25),labels=c(-20.0,"",-19.5,"",-19.0,"",""),expand = c(0,0))+
-  xlab(expression(paste("Minimum "*delta^13*"C (\u2030)")))+
-  ylab(expression(paste("Maximum "*delta^13*"C (\u2030)")))+
-  ggtitle("Post molting")+
-  #annotate("text", x = 10, y = 0.40, label = "italic(R^2)== 0.60", parse = TRUE, hjust = 0)+
-  theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
-  theme(legend.key=element_rect(colour="white")) 
-
-bb<-ggplot(subset(summ.count.seals,n.samples.PB>1&Sex=="Female"), aes(x=min.d13C.PB, y=max.d13C.PB,fill=n.samples.PB.2,shape=n.samples.PB.2))
-BB<-bb + geom_point(size=3,color="black")+
-  scale_fill_manual(values=c("gray75"),labels=c("Female: 2 isotope samples"))+
-  scale_shape_manual(values=c(21),labels=c("Female: 2 isotope samples"))+
-  geom_segment(aes(y=-20,yend=-18.5, x=-20,xend=-18.5),color="gray75",lty=2,lwd=1)+
-  theme_bw()+
-  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title=element_text(size=12), 
-        legend.title=element_blank(), legend.position="none",
-        legend.text=element_text(size=10),
-        axis.title.y=element_text(vjust=1,color="black"),
-        axis.text=element_text(size=12,color="black"),
-        axis.text.y=element_text(angle=90, hjust=0.5,color="black"),
-        plot.title=element_text(face="bold",hjust=0.5))+
-  scale_x_continuous(limits=c(-20,-18.5),breaks=seq(-20,-18.5,0.25),labels=c(-20.0,"",-19.5,"",-19.0,"",""),expand = c(0,0))+
-  scale_y_continuous(limits=c(-20,-18.5),breaks=seq(-20,-18.5,0.25),labels=c(-20.0,"",-19.5,"",-19.0,"",""),expand = c(0,0))+
-  xlab(expression(paste("Minimum "*delta^13*"C (\u2030)")))+
-  ylab(expression(paste("Maximum "*delta^13*"C (\u2030)")))+
-  ggtitle("Post breeding")+
-  #annotate("text", x = 10, y = 0.40, label = "italic(R^2)== 0.60", parse = TRUE, hjust = 0)+
-  theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
-  theme(legend.key=element_rect(colour="white")) 
-
-cc<-ggplot(subset(summ.count.seals,n.samples.PM>1&Sex=="Female"), aes(x=min.d15N.PM, y=max.d15N.PM,fill=n.samples.PM.2,shape=n.samples.PM.2))
-CC<-cc + geom_point(size=3,color="black")+
-  scale_fill_manual(values=c("gray75","white"),labels=c("Female: 2 isotope samples","Female: 3 isotope samples"))+
-  scale_shape_manual(values=c(21,21),labels=c("Female: 2 isotope samples","Female: 3 isotope samples"))+
-  geom_segment(aes(y=13.25,yend=17.3,x=13.25,xend=17.3),color="gray75",lty=2,lwd=1)+
-  theme_bw()+
-  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title=element_text(size=12), 
-        legend.title=element_blank(), legend.position="none",
-        legend.text=element_text(size=10),
-        axis.title.y=element_text(vjust=1,color="black"),
-        axis.text=element_text(size=12,color="black"),
-        axis.text.y=element_text(angle=90, hjust=0.5,color="black"),
-        plot.title=element_text(face="bold",hjust=0.5))+
-  scale_x_continuous(limits=c(13.25,17.3),breaks=seq(13.5,17,0.5),labels=c("",14,"",15,"",16,"",17),expand = c(0,0))+
-  scale_y_continuous(limits=c(13.25,17.3),breaks=seq(13.5,17,0.5),labels=c("",14,"",15,"",16,"",17),expand = c(0,0))+
-  xlab(expression(paste("Minimum "*delta^15*"N (\u2030)")))+
-  ylab(expression(paste("Maximum "*delta^15*"N (\u2030)")))+
-  ggtitle("Post molting")+
-  #annotate("text", x = 10, y = 0.40, label = "italic(R^2)== 0.60", parse = TRUE, hjust = 0)+
-  theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
-  theme(legend.key=element_rect(colour="white")) 
-
-dd<-ggplot(subset(summ.count.seals,n.samples.PB>1&Sex=="Female"), aes(x=min.d15N.PB, y=max.d15N.PB,fill=n.samples.PB.2,shape=n.samples.PB.2))
-DD<-dd + geom_point(size=3,color="black")+
-  scale_fill_manual(values=c("gray75"),labels=c("Female: 2 isotope samples"))+
-  scale_shape_manual(values=c(21),labels=c("Female: 2 isotope samples"))+
-  geom_segment(aes(y=13.25,yend=17.3,x=13.25,xend=17.3),color="gray75",lty=2,lwd=1)+
-  theme_bw()+
-  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title=element_text(size=12), 
-        legend.title=element_blank(), legend.position="none",
-        legend.text=element_text(size=10),
-        axis.title.y=element_text(vjust=1,color="black"),
-        axis.text=element_text(size=12,color="black"),
-        axis.text.y=element_text(angle=90, hjust=0.5,color="black"),
-        plot.title=element_text(face="bold",hjust=0.5))+
-  scale_x_continuous(limits=c(13.25,17.3),breaks=seq(13.5,17,0.5),labels=c("",14,"",15,"",16,"",17),expand = c(0,0))+
-  scale_y_continuous(limits=c(13.25,17.3),breaks=seq(13.5,17,0.5),labels=c("",14,"",15,"",16,"",17),expand = c(0,0))+
-  xlab(expression(paste("Minimum "*delta^15*"N (\u2030)")))+
-  ylab(expression(paste("Maximum "*delta^15*"N (\u2030)")))+
-  ggtitle("Post breeding")+
-  #annotate("text", x = 10, y = 0.40, label = "italic(R^2)== 0.60", parse = TRUE, hjust = 0)+
-  theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
-  theme(legend.key=element_rect(colour="white")) 
-
-tiff("../figures/RepeatFemales.tiff", width=8, height=8,units="in",res=150)
-grid.arrange(AA,BB,CC,DD, ncol=2,nrow=2)
-dev.off()
-
-
-
-#############################################################
-aa<-ggplot(subset(summ.count.seals,n.samples>1&Sex=="Female"), aes(x=min.d13C, y=max.d13C,fill=n.samples,shape=n.samples))
-AA<-aa + geom_point(size=3,color="black")+
-  scale_fill_manual(values=c("gray75","white","black"),labels=c("Female: 2 samples","Female: 3 samples","Female: 4 samples"))+
-  scale_shape_manual(values=c(21,21,21),labels=c("Female: 2 samples","Female: 3 samples","Female: 4 samples"))+
-  geom_segment(aes(y=-20,yend=-18.5, x=-20,xend=-18.5),color="gray75",lty=2,lwd=1)+
-  theme_bw()+
-  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title=element_text(size=12), 
-        legend.title=element_blank(), legend.position=c(0.21,0.89),
-        legend.text=element_text(size=8),
-        legend.key.size = unit(0.7, 'lines'),
-        axis.title.y=element_text(vjust=1,color="black"),
-        axis.text=element_text(size=12,color="black"),
-        axis.text.y=element_text(angle=90, hjust=0.5,color="black"),
-        plot.title=element_text(face="bold",hjust=0.5))+
-  scale_x_continuous(limits=c(-20.1,-18.5),breaks=seq(-20,-18.5,0.25),labels=c(-20.0,"",-19.5,"",-19.0,"",""),expand = c(0,0))+
-  scale_y_continuous(limits=c(-20.1,-18.5),breaks=seq(-20,-18.5,0.25),labels=c(-20.0,"",-19.5,"",-19.0,"",""),expand = c(0,0))+
-  xlab(expression(paste("Minimum "*delta^13*"C (\u2030)")))+
-  ylab(expression(paste("Maximum "*delta^13*"C (\u2030)")))+
-  ggtitle("Both foraging trips")+
-  #annotate("text", x = 10, y = 0.40, label = "italic(R^2)== 0.60", parse = TRUE, hjust = 0)+
-  theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
-  theme(legend.key=element_rect(colour="white")) 
-
-dd<-ggplot(subset(summ.count.seals,n.samples>1&Sex=="Female"), aes(x=min.d15N, y=max.d15N,fill=n.samples,shape=n.samples))
-DD<-dd + geom_point(size=3,color="black")+
-  scale_fill_manual(values=c("gray75","white","black"),labels=c("Female: 2 samples","Female: 3 samples","Female: 4 samples"))+
-  scale_shape_manual(values=c(21,21,21),labels=c("Female: 2 samples","Female: 3 samples","Female: 4 samples"))+
-  geom_segment(aes(y=13.25,yend=17.3,x=13.25,xend=17.3),color="gray75",lty=2,lwd=1)+
-  theme_bw()+
-  theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(), axis.title=element_text(size=12), 
-        legend.title=element_blank(), legend.position="none",
-        legend.text=element_text(size=10),
-        legend.key.size = unit(0.7, 'lines'),
-        axis.title.y=element_text(vjust=1,color="black"),
-        axis.text=element_text(size=12,color="black"),
-        axis.text.y=element_text(angle=90, hjust=0.5,color="black"),
-        plot.title=element_text(face="bold",hjust=0.5))+
-  scale_x_continuous(limits=c(13.25,17.3),breaks=seq(13.5,17,0.5),labels=c("",14,"",15,"",16,"",17),expand = c(0,0))+
-  scale_y_continuous(limits=c(13.25,17.3),breaks=seq(13.5,17,0.5),labels=c("",14,"",15,"",16,"",17),expand = c(0,0))+
-  xlab(expression(paste("Minimum "*delta^15*"N (\u2030)")))+
-  ylab(expression(paste("Maximum "*delta^15*"N (\u2030)")))+
-  ggtitle("Both foraging trips")+
-  #annotate("text", x = 10, y = 0.40, label = "italic(R^2)== 0.60", parse = TRUE, hjust = 0)+
-  theme(panel.grid.major=element_line(colour=NA), panel.grid.minor=element_line(colour=NA))+
-  theme(legend.key=element_rect(colour="white")) 
-
-tiff("../figures/RepeatFemalesSeasonsTogether.tiff", width=8, height=4,units="in",res=150)
-grid.arrange(AA,DD, ncol=2,nrow=1)
-dev.off()
+```
