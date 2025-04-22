@@ -527,3 +527,50 @@ ggsave(filename = "../figures/PB_DeepNightForageDivesMedian_m.pdf",
 print(plt.niche)
 
 ```
+
+Boxpltos for isotopes to compare with the males
+
+```{r}
+
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = cluster,
+  y = d13C,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "PB Clusters",
+  ylab = "d13C") +
+  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999'))
+
+ggsave(filename = "../figures/PB_d13C.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+plt.niche <- ggbetweenstats(
+  data = data4boxplot,
+  x = cluster,
+  y = d15N,
+  pairwise.display = "none",
+  #type = "rb",
+  #box.args = list(width = 0),
+  #point.args = list(alpha = 0),
+    xlab = "PB Clusters",
+  ylab = "d15N") +
+  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999'))
+
+ggsave(filename = "../figures/PB_d15N.pdf",
+       plot = plt.niche,
+       device = cairo_pdf)
+
+print(plt.niche)
+
+
+```
