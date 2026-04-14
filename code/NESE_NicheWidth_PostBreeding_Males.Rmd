@@ -129,7 +129,7 @@ aggregate(m.PCAdata.1.1[1:3], m.PCAdata.1.1[4], mean)
 # Generate parameter draws
 nsamples <- 1e4
 system.time({
- PM.par <- tapply(1:nrow(m.PCAdata.1.1), m.PCAdata.1.1$IntClusters,
+ PB.par <- tapply(1:nrow(m.PCAdata.1.1), m.PCAdata.1.1$IntClusters,
                     function(ii) niw.post(nsamples = nsamples, X = m.PCAdata.1.1[ii,1:3], Psi = Psi))
 })
 
@@ -143,23 +143,23 @@ clrs <- c("#e41a1c",
 
 # Plot all mu 
 pdf("../figures/PostMu_MalesPB.pdf")
-niche.par.plot(PM.par, col = clrs, plot.mu = TRUE, plot.Sigma = FALSE)
-legend("topleft", legend = names(PM.par), fill = clrs)
+niche.par.plot(PB.par, col = clrs, plot.mu = TRUE, plot.Sigma = FALSE)
+legend("topleft", legend = names(PB.par), fill = clrs)
 dev.off()
 
-niche.par.plot(PM.par, col = clrs, plot.mu = TRUE, plot.Sigma = FALSE)
-legend("topleft", legend = names(PM.par), fill = clrs)
+niche.par.plot(PB.par, col = clrs, plot.mu = TRUE, plot.Sigma = FALSE)
+legend("topleft", legend = names(PB.par), fill = clrs)
 
 # Plot all Sigma 
 pdf("../figures/PostSigma_MalesPB.pdf")
 par(mar = c(1,1,1,1))
-niche.par.plot(PM.par, col = clrs, plot.mu = FALSE, plot.Sigma = TRUE)
-legend("topleft", legend = names(PM.par), fill = clrs)
+niche.par.plot(PB.par, col = clrs, plot.mu = FALSE, plot.Sigma = TRUE)
+legend("topleft", legend = names(PB.par), fill = clrs)
 dev.off()
 
 par(mar = c(1,1,1,1))
-niche.par.plot(PM.par, col = clrs, plot.mu = FALSE, plot.Sigma = TRUE)
-legend("topleft", legend = names(PM.par), fill = clrs)
+niche.par.plot(PB.par, col = clrs, plot.mu = FALSE, plot.Sigma = TRUE)
+legend("topleft", legend = names(PB.par), fill = clrs)
 
 # 2-d projections of 50 niche regions
 nsamples <- 50
@@ -167,47 +167,47 @@ PM.par <- tapply(1:nrow(m.PCAdata.1.1), m.PCAdata.1.1$IntClusters,
                   function(ii) niw.post(nsamples = nsamples, X = m.PCAdata.1.1[ii,1:3], Psi = Psi))
 
 # format data for plotting function
-PM.data <- tapply(1:nrow(m.PCAdata.1.1), m.PCAdata.1.1$IntClusters, function(ii) X = m.PCAdata.1.1[ii,1:3])
+PB.data <- tapply(1:nrow(m.PCAdata.1.1), m.PCAdata.1.1$IntClusters, function(ii) X = m.PCAdata.1.1[ii,1:3])
 
 pdf("../figures/NicheRegionsMalesPB.pdf")
-niche.plot(niche.par = PM.par, niche.data = PM.data, pfrac = .05,
+niche.plot(niche.par = PB.par, niche.data = PB.data, pfrac = .05,
           iso.names = c(expression(paste(delta^{13}, "C")),expression(paste(delta^{15}, "N")),
                         'Standard Length'), col = clrs, xlab = expression("Variables"))
 dev.off()
 
-niche.plot(niche.par = PM.par, niche.data = PM.data, pfrac = .05,
+niche.plot(niche.par = PB.par, niche.data = PB.data, pfrac = .05,
           iso.names = c(expression(paste(delta^{13}, "C")),expression(paste(delta^{15}, "N")),
                         'Standard Length'), col = clrs, xlab = expression("Variables"))
 #########################
 
 # niche overlap plots for 95% niche region sizes
 nsamples <- 10000
-PM.par <- tapply(1:nrow(m.PCAdata.1.1), m.PCAdata.1.1$IntClusters,
+PB.par <- tapply(1:nrow(m.PCAdata.1.1), m.PCAdata.1.1$IntClusters,
                   function(ii) niw.post(nsamples = nsamples, X = m.PCAdata.1.1[ii,1:3], Psi = Psi))
 
 # Overlap calculation.  use nsamples = nprob = 10000 (1e4) for higher accuracy.
 # the variable over.stat can be supplied directly to the overlap.plot function
 
-over.stat.PM <- overlap(PM.par, nreps = nsamples, nprob = 1e4, alpha = c(0.95, 0.99))
+over.stat.PB <- overlap(PB.par, nreps = nsamples, nprob = 1e4, alpha = c(0.95, 0.99))
 
 #The mean overlap metrics calculated across iterations for both niche 
 #region sizes (alpha = .95 and alpha = .99) can be calculated and displayed in an array.
-over.mean.PM <- apply(over.stat.PM, c(1:2,4), mean)*100
-round(over.mean.PM, 2)
+over.mean.PB <- apply(over.stat.PB, c(1:2,4), mean)*100
+round(over.mean.PB, 2)
 
 # Credibility Intervals
-over.cred.PM <- apply(over.stat.PM*100, c(1:2, 4), quantile, prob = c(.025, .975), na.rm = TRUE)
-round(over.cred.PM[,,,1]) # display alpha = .95 niche region
+over.cred.PB <- apply(over.stat.PB*100, c(1:2, 4), quantile, prob = c(.025, .975), na.rm = TRUE)
+round(over.cred.PB[,,,1]) # display alpha = .95 niche region
 
 # Overlap plot
 #clrs <- c("#1b9e77", "#d95f02", "#7570b3") # colors for each cluster
-over.stat.PM <- overlap(PM.par, nreps = nsamples, nprob = 1e4, alpha = .95)
+over.stat.PB <- overlap(PB.par, nreps = nsamples, nprob = 1e4, alpha = .95)
 pdf("../figures/NicheOverlapMalesPB.pdf")
-overlap.plot(over.stat.PM, col = clrs, mean.cred.col = "turquoise", equal.axis = TRUE,
+overlap.plot(over.stat.PB, col = clrs, mean.cred.col = "turquoise", equal.axis = TRUE,
             xlab = "Males Overlap Probability (%) -- Niche Region Size: 95%")
 dev.off()
 
-overlap.plot(over.stat.PM, col = clrs, mean.cred.col = "turquoise", equal.axis = TRUE,
+overlap.plot(over.stat.PB, col = clrs, mean.cred.col = "turquoise", equal.axis = TRUE,
             xlab = "Males Overlap Probability (%) -- Niche Region Size: 95%")
 
 ################################################################################
@@ -215,68 +215,68 @@ overlap.plot(over.stat.PM, col = clrs, mean.cred.col = "turquoise", equal.axis =
 
 # posterior distribution of (mu, Sigma) for each strategy
 nsamples <- 10000
-PM.par <- tapply(1:nrow(m.PCAdata.1.1), m.PCAdata.1.1$IntClusters,
+PB.par <- tapply(1:nrow(m.PCAdata.1.1), m.PCAdata.1.1$IntClusters,
                   function(ii) niw.post(nsamples = nsamples, X = m.PCAdata.1.1[ii,1:3], Psi = Psi))
 
 # posterior distribution of niche size by species using the 75% contour to define strategy niche
-PM.size <- sapply(PM.par, function(spec) {
+PB.size <- sapply(PB.par, function(spec) {
   apply(spec$Sigma, 3, niche.size, alpha = .75)
 })
 
 # point estimate and standard error
-rbind(est = colMeans(PM.size),
-      se = apply(PM.size, 2, sd))
+rbind(est = colMeans(PB.size),
+      se = apply(PB.size, 2, sd))
 
 # Niche Size
-PM.size2 <- matrix(NA, nrow = 30000, ncol = 2)
-colnames(PM.size2) <- c("Niche_Size", "SubCluster")
-PM.size2[1:10000,1] <- PM.size[,1]
-PM.size2[1:10000,2] <- 'SubCluster 1'
-PM.size2[10001:20000,1] <- PM.size[,2]
-PM.size2[10001:20000,2] <- 'SubCluster 2'
-PM.size2[20001:30000,1] <- PM.size[,3]
-PM.size2[20001:30000,2] <- 'SubCluster 3'
+PB.size2 <- matrix(NA, nrow = 30000, ncol = 2)
+colnames(PB.size2) <- c("Niche_Size", "Cluster")
+PB.size2[1:10000,1] <- PB.size[,1]
+PB.size2[1:10000,2] <- 'Cluster 1'
+PB.size2[10001:20000,1] <- PB.size[,2]
+PB.size2[10001:20000,2] <- 'Cluster 2'
+PB.size2[20001:30000,1] <- PB.size[,3]
+PB.size2[20001:30000,2] <- 'Cluster 3'
 
-PM.size2 <- as.data.frame(PM.size2)
-PM.size2$Niche_Size <- as.numeric(PM.size2$Niche_Size)
+PB.size2 <- as.data.frame(PB.size2)
+PB.size2$Niche_Size <- as.numeric(PB.size2$Niche_Size)
 
 # Bhattacharyya coefficient to see how different the niche sizes are
 # Create an empty matrix
 
-Olap.PM <- matrix(NA,3,3)
-colnames(Olap.PM) <- c('SubCluster 1',
-                        'SubCluster 2',
-                        'SubCluster 3')
+Olap.PB <- matrix(NA,3,3)
+colnames(Olap.PB) <- c('Cluster 1',
+                        'Cluster 2',
+                        'Cluster 3')
 
-rownames(Olap.PM) <- c('SubCluster 1',
-                        'SubCluster 2',
-                        'SubCluster 3')
+rownames(Olap.PB) <- c('Cluster 1',
+                        'Cluster 2',
+                        'Cluster 3')
 
 for (sc in 1:3){
   for (sc2 in 1:3){
-    Olap.PM[sc,sc2] <-  bhatt.coeff(PM.size[,sc], PM.size[,sc2])
+    Olap.PB[sc,sc2] <-  bhatt.coeff(PB.size[,sc], PB.size[,sc2])
   }
   
 }
 
-Olap.PM
+Olap.PB
 
-median(PM.size[,1])
-range(PM.size[,1])
+median(PB.size[,1])
+range(PB.size[,1])
 
-median(PM.size[,2])
-range(PM.size[,2])
+median(PB.size[,2])
+range(PB.size[,2])
 
-median(PM.size[,3])
-range(PM.size[,3])
+median(PB.size[,3])
+range(PB.size[,3])
 
 
 plt.niche <- ggbetweenstats(
-  data = PM.size2,
-  x = SubCluster,
+  data = PB.size2,
+  x = Cluster,
   y = Niche_Size,
   pairwise.display = "none",
-  xlab = "SubClusters",
+  xlab = "Clusters",
   ylab = "Niche Size"
   )
 print(plt.niche)
