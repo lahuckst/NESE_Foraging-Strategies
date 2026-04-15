@@ -1,0 +1,92 @@
+---
+title: "NESE_MalesClusterCorrespondence"
+author: "Luis Huckstadt"
+date: "2026-04-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load all libraries
+```{r}
+
+library(dplyr)
+library(vegan)
+library(pairwiseAdonis)
+library(stringr)
+
+```
+
+Similarities for males cluster
+
+```{r}
+
+data_iso <- read.csv("../results/Males_SeasonalClusters.csv")
+data_iso$SeasonalClusters <- str_replace_all(data_iso$SeasonalClusters, fixed(" "), "")
+data_iso[,6:8] <- scale(data_iso[,6:8]) # Scale the data
+
+#Calculate centroids
+season.centroids <- data_iso %>%
+  group_by(SeasonalClusters) %>%
+  summarise(across(c(d13C,d15N,StandardLength_cm),mean))
+
+centroid_mat <- as.matrix(season.centroids[, -1])
+labels <- season.centroids$SeasonalClusters
+
+dist_mat <- dist(centroid_mat)
+hc <- hclust(dist_mat)
+hc$labels <- labels
+
+plot(hc, main = 'Relationship among Clusters for Males NESE', xlab = "", sub = "")
+
+```
+
+PERMANOVA and pairwise distances
+```{r}
+
+dist_mat <- dist(data_iso[,6:8])
+adonis2(dist_mat ~ SeasonalClusters, data = data_iso)
+
+# Pairwise differences among clusters
+pairwise.adonis(dist_mat, data_iso$SeasonalClusters)
+
+```
+
+Distance between centroids using vegan
+```{r}
+dist_mat <- dist(data_iso[,6:8])
+centroid_dist <- betadisper(dist_mat, data_iso$SeasonalClusters)
+distance <- dist(centroid_dist$centroids)
+anova(centroid_dist) # Check dispersion
+
+as.matrix(distance)
+
+hc <- hclust(distance)
+hc$labels <- labels
+
+plot(hc, main = 'Relationship among Clusters for Males NESE', xlab = "", sub = "")
+
+
+```
+
+```{r}
+
+#PCA to visualise dispersion
+pca <- prcomp(data_iso[,6:8])
+data_iso$SeasonalClusters <- as.factor(data_iso$SeasonalClusters)
+group_levels <- levels(data_iso$SeasonalClusters)
+palette <- c("red", "blue", "green", "orange", "purple", "black")
+
+cols <- palette[as.numeric(data_iso$SeasonalClusters)]
+
+plot(pca$x[,1], pca$x[,2],
+     col = cols,
+     pch = 19)
+
+legend("topright",
+       legend = group_levels,
+       col = palette,
+       pch = 19)
+```

@@ -1,14 +1,14 @@
-"","MasterID","MainID","Trip","Sex","ProcedureYear","d13C","d15N","StandardLength_cm","ProcedureDate","IntClusters"
-"PB20114055","PB20114055","4055","PostBreeding","Male","2011",-18.83,14.75,364,"7/26/11","Cluster 1"
-"PB20115413","PB20115413","5413","PostBreeding","Male","2011",-19.04,15.34,383,"8/2/11","Cluster 2"
-"PB20116249","PB20116249","6249","PostBreeding","Male","2011",-17.78,16.05,370,"7/18/11","Cluster 3"
-"PB20126379","PB20126379","6379","PostBreeding","Male","2012",-16.44,16.13,386,"7/7/12","Cluster 3"
-"PB20126384","PB20126384","6384","PostBreeding","Male","2012",-17.63,15.37,380,"7/7/12","Cluster 3"
-"PB20126698","PB20126698","6698","PostBreeding","Male","2012",-16.33,16.48,372,"7/7/12","Cluster 3"
-"PB20135795","PB20135795","5795","PostBreeding","Male","2013",-18.95,14.4,413,"7/26/13","Cluster 2"
-"PB20139627","PB20139627","9627","PostBreeding","Male","2013",-18.73,15.09,397,"7/25/13","Cluster 2"
-"PB20139628","PB20139628","9628","PostBreeding","Male","2013",-17.94,15.73,330,"7/25/13","Cluster 1"
-"PB20139629","PB20139629","9629","PostBreeding","Male","2013",-19.16,15.26,355,"7/26/13","Cluster 1"
-"PB20139630","PB20139630","9630","PostBreeding","Male","2013",-17.56,16.15,390,"7/27/13","Cluster 3"
-"PB20139633","PB20139633","9633","PostBreeding","Male","2013",-17.39,15.84,410,"7/27/13","Cluster 3"
-"PB20139634","PB20139634","9634","PostBreeding","Male","2013",-15.91,16.08,364,"7/27/13","Cluster 3"
+,MasterID,MainID,Trip,Sex,ProcedureYear,d13C,d15N,StandardLength_cm,ProcedureDate,IntClusters
+PB20114055,PB20114055,4055,PostBreeding,Male,2011,-18.83,14.75,364,7/26/11,Cluster 1
+PB20115413,PB20115413,5413,PostBreeding,Male,2011,-19.04,15.34,383,08/02/2011,Cluster 2
+PB20116249,PB20116249,6249,PostBreeding,Male,2011,-17.78,16.05,370,7/18/11,Cluster 3
+PB20126379,PB20126379,6379,PostBreeding,Male,2012,-16.44,16.13,386,07/07/2012,Cluster 3
+PB20126384,PB20126384,6384,PostBreeding,Male,2012,-17.63,15.37,380,07/07/2012,Cluster 3
+PB20126698,PB20126698,6698,PostBreeding,Male,2012,-16.33,16.48,372,07/07/2012,Cluster 3
+PB20135795,PB20135795,5795,PostBreeding,Male,2013,-18.95,14.4,413,7/26/13,Cluster 2
+PB20139627,PB20139627,9627,PostBreeding,Male,2013,-18.73,15.09,397,7/25/13,Cluster 2
+PB20139628,PB20139628,9628,PostBreeding,Male,2013,-17.94,15.73,330,7/25/13,Cluster 1
+PB20139629,PB20139629,9629,PostBreeding,Male,2013,-19.16,15.26,355,7/26/13,Cluster 1
+PB20139630,PB20139630,9630,PostBreeding,Male,2013,-17.56,16.15,390,7/27/13,Cluster 3
+PB20139633,PB20139633,9633,PostBreeding,Male,2013,-17.39,15.84,410,7/27/13,Cluster 3
+PB20139634,PB20139634,9634,PostBreeding,Male,2013,-15.91,16.08,364,7/27/13,Cluster 3
