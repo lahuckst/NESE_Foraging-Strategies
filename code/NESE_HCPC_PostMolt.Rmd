@@ -252,11 +252,11 @@ system.time({
 
 
 # various parameter plots
-clrs <- c("#e41a1c",
-          "#377eb8",
-          "#4daf4a",
-          "#984ea3",
-          "#ff7f00") # colors for each cluster
+clrs <- c("#7571b2",
+          "#1c9f79",
+          "#d96116",
+          "#e52e89",
+          "#fdc608") # colors for each cluster
 
 # Plot all mu 
 pdf("../figures/PostMu_PM.pdf")
@@ -402,7 +402,9 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
   xlab = "Clusters Post-Moult",
   ylab = "Niche Size"
-  )
+  )+
+  ggplot2::scale_color_manual(values = clrs)
+
 print(plt.niche)
 ggsave(filename = "../figures/NicheStrategies_PM.pdf",
        plot = plt.niche,
