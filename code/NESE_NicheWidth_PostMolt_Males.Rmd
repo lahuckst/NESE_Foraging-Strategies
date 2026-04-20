@@ -120,10 +120,18 @@ write.csv(m.PCAdata.1,'../results/Males_PMClusters.csv')
 
 Niche Analysis
 ```{r}
+# From this point onwards, PMCLuster 2 amd 3 will be swapped to match the PB Cluster based on the distance between centroids
+
+
 d <- 3
 Psi <- crossprod(matrix(rnorm(d^2), d, d)) # scale
 
 m.PCAdata.1.1$IntClusters <-  paste('Cluster',cutree(hc.m.all, k =3))
+m.PCAdata.1.1$IntClusters2 <- m.PCAdata.1.1$IntClusters
+m.PCAdata.1.1$IntClusters2[which(m.PCAdata.1.1$IntClusters=='Cluster 2')] <- 'Cluster 3'
+m.PCAdata.1.1$IntClusters2[which(m.PCAdata.1.1$IntClusters=='Cluster 3')] <- 'Cluster 2'
+m.PCAdata.1.1$IntClusters <- m.PCAdata.1.1$IntClusters2
+
 aggregate(m.PCAdata.1.1[1:3], m.PCAdata.1.1[4], mean)
 
 # Generate parameter draws

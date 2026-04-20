@@ -241,7 +241,7 @@ system.time({
 
 
 # various parameter plots
-clrs <- c("#1b9e77", "#d95f02", "#7570b3") # colors for each cluster
+clrs <- c("#7570b3","#1b9e77","#d95f02") # colors for each cluster
 
 # Plot all mu 
 pdf("../figures/PostMu_PB.pdf")
@@ -300,7 +300,7 @@ over.cred.PB <- apply(over.stat.PB*100, c(1:2, 4), quantile, prob = c(.025, .975
 round(over.cred.PB[,,,1]) # display alpha = .95 niche region
 
 # Overlap plot
-clrs <- c("#1b9e77", "#d95f02", "#7570b3") # colors for each cluster
+#clrs <- c("#1b9e77", "#d95f02", "#7570b3") # colors for each cluster
 over.stat.PB <- overlap(PB.par, nreps = nsamples, nprob = 1e4, alpha = .95)
 pdf("../figures/NicheOverlapPB.pdf")
 overlap.plot(over.stat.PB, col = clrs, mean.cred.col = "turquoise", equal.axis = TRUE,
@@ -341,12 +341,11 @@ plt.niche <- ggbetweenstats(
   data = PB.size2,
   x = Cluster,
   y = Niche_Size,
-  #type = "b",
-  #violin.args = list(width = 0),
-  #point.args = list(alpha = 0),
   xlab = "Clusters Post-Breeding",
   ylab = "Niche Size"
-  )
+  ) +
+  ggplot2::scale_color_manual(values = clrs)
+
 plt.niche
 ggsave(filename = "../figures/NicheStrategies_PB.pdf",
        plot = plt.niche,
