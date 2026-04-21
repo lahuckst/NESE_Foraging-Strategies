@@ -62,6 +62,14 @@ our_summary1 <-
 # Import the data
 f.PCAdata.1 <- readRDS("../data/f.PCAdata.1.rds")
 
+# various parameter plots
+clrs <- c("#7571b2",
+          "#1c9f79",
+          "#d96116",
+          "#e52e89",
+          "#fdc608") 
+
+
 ```
 
 ```{r}
@@ -186,7 +194,7 @@ res.hcpc.1.PB <- HCPC(res.pca.f.1.PB,
 
 fig <- fviz_dend(res.hcpc.1.PB, 
           cex = 0.7,                     # Label size
-          palette = "jco",               # Color palette see ?ggpubr::ggpar
+          palette = clrs,               # Color palette see ?ggpubr::ggpar
           rect = TRUE, rect_fill = TRUE, # Add rectangle around groups
           rect_border = "jco",           # Rectangle color
           labels_track_height = 0.8,      # Augment the room for labels
@@ -201,7 +209,7 @@ ggsave(filename = "../figures/PCA_HCPC_PB.pdf",
 fig <- fviz_cluster(res.hcpc.1.PB,
              repel = TRUE,            # Avoid label overlapping
              show.clust.cent = TRUE, # Show cluster centers
-             palette = "jco",         # Color palette see ?ggpubr::ggpar
+             palette = clrs,         # Color palette see ?ggpubr::ggpar
              ggtheme = theme_minimal(),
              main = "Factor map"
              )
