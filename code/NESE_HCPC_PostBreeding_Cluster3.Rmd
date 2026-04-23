@@ -63,6 +63,9 @@ our_summary1 <-
 # Import the data
 f.PCAdata.PB <- readRDS("../data/f.PCAdata.PB.rds")
 
+# various parameter plots
+clrs <- c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3","#ff7f00")
+
 ```
  
  HCPC Analysis for PB Cluster 3
@@ -207,7 +210,7 @@ res.hcpc.1.PB.3 <- HCPC(res.pca.f.1.PB.3,
 
 f <- fviz_dend(res.hcpc.1.PB.3, 
           cex = 0.7,                     # Label size
-          palette = "jco",               # Color palette see ?ggpubr::ggpar
+          palette = clrs,               # Color palette see ?ggpubr::ggpar
           rect = TRUE, rect_fill = TRUE, # Add rectangle around groups
           rect_border = "jco",           # Rectangle color
           labels_track_height = 0.8,      # Augment the room for labels
@@ -223,7 +226,7 @@ ggsave(filename = "../figures/PCA_HCPC_PB3.pdf",
 f <- fviz_cluster(res.hcpc.1.PB.3,
              repel = TRUE,            # Avoid label overlapping
              show.clust.cent = TRUE, # Show cluster centers
-             palette = "jco",         # Color palette see ?ggpubr::ggpar
+             palette = clrs,         # Color palette see ?ggpubr::ggpar
              ggtheme = theme_minimal(),
              main = "Factor map"
              )
@@ -266,8 +269,7 @@ system.time({
 })
 
 
-# various parameter plots
-clrs <- c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3","#ff7f00") # colors for each cluster
+ # colors for each cluster
 
 # Plot all mu 
 pdf("../figures/PostMu_PB3.pdf")
@@ -400,7 +402,8 @@ plt.niche <- ggbetweenstats(
   point.args = list(alpha = 0),
   xlab = "SubClusters PB3",
   ylab = "Niche Size"
-  )
+  ) +
+  ggplot2::scale_color_manual(values = clrs)
 
 print(plt.niche)
 
