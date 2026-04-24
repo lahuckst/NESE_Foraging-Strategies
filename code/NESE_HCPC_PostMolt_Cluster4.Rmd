@@ -65,6 +65,14 @@ our_summary1 <-
 f.PCAdata.PM <- read.csv('../results/PM_Clusters.csv')
 f.PCAdata.PM <- f.PCAdata.PM[,2:ncol(f.PCAdata.PM)]
 
+
+# various parameter plots
+clrs <- c("#d7191c",
+          "#fdae61",
+          "#abd9e9",
+          "#2c7bb6") # colors for each cluster
+
+
 ```
 
 PM Cluster 4
@@ -192,7 +200,7 @@ res.hcpc.1.PM.4 <- HCPC(res.pca.f.1.PM.4,
 
 f <- fviz_dend(res.hcpc.1.PM.4, 
           cex = 0.7,                     # Label size
-          palette = "jco",               # Color palette see ?ggpubr::ggpar
+          palette = clrs,               # Color palette see ?ggpubr::ggpar
           rect = TRUE, rect_fill = TRUE, # Add rectangle around groups
           rect_border = "jco",           # Rectangle color
           labels_track_height = 0.8,      # Augment the room for labels
@@ -208,7 +216,7 @@ print(f)
 f <- fviz_cluster(res.hcpc.1.PM.4,
              repel = TRUE,            # Avoid label overlapping
              show.clust.cent = TRUE, # Show cluster centers
-             palette = "jco",         # Color palette see ?ggpubr::ggpar
+             palette = clrs,         # Color palette see ?ggpubr::ggpar
              ggtheme = theme_minimal(),
              main = "Factor map"
              )
@@ -247,12 +255,6 @@ system.time({
                     function(ii) niw.post(nsamples = nsamples, X = data4Niche.PM.4[ii,30:36], Psi = Psi))
 })
 
-
-# various parameter plots
-clrs <- c("#d7191c",
-          "#fdae61",
-          "#abd9e9",
-          "#2c7bb6") # colors for each cluster
 
 # Plot all mu 
 pdf("../figures/PostMu_PM4.pdf")
@@ -392,7 +394,9 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
   xlab = "PMC4 SubClusters",
   ylab = "Niche Size"
-  )
+  ) +
+  ggplot2::scale_color_manual(values = clrs)
+
 ggsave(filename = "../figures/NicheStrategies_PMC4.pdf",
        plot = plt.niche,
        device = cairo_pdf)
@@ -423,7 +427,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM4",
   ylab = "MesoEcoProportionNorthCPac") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3','#e7298a'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC4_MesoEcoProportionNorthCPac.pdf",
        plot = plt.niche,
@@ -442,7 +446,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM4",
   ylab = "MesoEcoProportionSubArcticPac") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3','#e7298a'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC4_MesoEcoProportionSubArcticPac.pdf",
        plot = plt.niche,
@@ -462,7 +466,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM4",
   ylab = "Pct_BenthicDives") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3','#e7298a'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC4_Pct_BenthicDives.pdf",
        plot = plt.niche,
@@ -481,7 +485,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM4",
   ylab = "d15N") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3','#e7298a'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC4_d15N.pdf",
        plot = plt.niche,
@@ -501,7 +505,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM4",
   ylab = "Mean_Depth_m") +
- ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3','#e7298a'))
+ ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC4_Mean_Depth_m.pdf",
        plot = plt.niche,
@@ -520,7 +524,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM4",
   ylab = "DeepNightForageDivesMedian_m") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3','#e7298a'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC4_DeepNightForageDivesMedian_m.pdf",
        plot = plt.niche,
