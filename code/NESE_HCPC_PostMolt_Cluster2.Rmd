@@ -63,6 +63,10 @@ our_summary1 <-
 # Import the data
 f.PCAdata.PM <- read.csv('../results/PM_Clusters.csv')
 f.PCAdata.PM <- f.PCAdata.PM[,2:ncol(f.PCAdata.PM)]
+
+# various parameter plots
+clrs <- c("#1f78b4",
+          "#33a02c") # colors for each cluster
 ```
 
 PM Cluster 2
@@ -172,7 +176,7 @@ ind.PCAPM.2 <- data.frame(ind.PCAPM.2$coord[,1:6])
 #ind.PCAM2 <- ind.PCAPM[,col2keep]
 
 res.nbclust <- NbClust(ind.PCAPM.2, distance = "euclidean",
-                       min.nc = 2, max.nc = 15, 
+                       min.nc = 2, max.nc = 5, 
                        method = "ward.D", index ="alllong")
 
 # Agree that 2 is the correct number of clusters
@@ -185,7 +189,7 @@ res.hcpc.1.PM.2 <- HCPC(res.pca.f.1.PM.2,
 
 f <- fviz_dend(res.hcpc.1.PM.2, 
           cex = 0.7,                     # Label size
-          palette = "jco",               # Color palette see ?ggpubr::ggpar
+          palette = clrs,               # Color palette see ?ggpubr::ggpar
           rect = TRUE, rect_fill = TRUE, # Add rectangle around groups
           rect_border = "jco",           # Rectangle color
           labels_track_height = 0.8,      # Augment the room for labels
@@ -202,7 +206,7 @@ ggsave(filename = "../figures/PCA_HCPC_PM2.pdf",
 fviz_cluster(res.hcpc.1.PM.2,
              repel = TRUE,            # Avoid label overlapping
              show.clust.cent = TRUE, # Show cluster centers
-             palette = "jco",         # Color palette see ?ggpubr::ggpar
+             palette = clrs,         # Color palette see ?ggpubr::ggpar
              ggtheme = theme_minimal(),
              main = "Factor map"
              )
@@ -242,11 +246,7 @@ system.time({
 })
 
 
-# various parameter plots
-clrs <- c("#a6cee3",
-          "#1f78b4",
-          "#b2df8a",
-          "#33a02c") # colors for each cluster
+
 
 # Plot all mu 
 pdf("../figures/PostMu_PM2.pdf")
@@ -380,7 +380,9 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
   xlab = "PMC2 SubClusters",
   ylab = "Niche Size"
-  )
+  )  +
+  ggplot2::scale_color_manual(values = clrs)
+
 ggsave(filename = "../figures/NicheStrategies_PMC2.pdf",
        plot = plt.niche,
        device = cairo_pdf)
@@ -411,7 +413,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM2",
   ylab = "MedianDistToContShelf_km") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC2_MedDist2Shelf.pdf",
        plot = plt.niche,
@@ -430,7 +432,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM2",
   ylab = "MaxLat_degrees") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC2_MaxLat.pdf",
        plot = plt.niche,
@@ -450,7 +452,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM2",
   ylab = "d15N") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC2_d15N.pdf",
        plot = plt.niche,
@@ -469,7 +471,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM2",
   ylab = "d13C") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC2_d13C.pdf",
        plot = plt.niche,
@@ -489,7 +491,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM2",
   ylab = "Pct_BenthicDives") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC2_Pct_BenthicDives.pdf",
        plot = plt.niche,
@@ -508,7 +510,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM2",
   ylab = "Pct_ForagingDives") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC2_Pct_ForagingDives.pdf",
        plot = plt.niche,
