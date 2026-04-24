@@ -64,7 +64,10 @@ our_summary1 <-
 # Import the data
 f.PCAdata.PB <- readRDS("../data/f.PCAdata.PB.rds")
 
-
+# various parameter plots
+clrs <- c('#e41a1c','#377eb8','#4daf4a','#984ea3',
+                               '#ff7f00','#ffff33','#a65628','#f781bf',
+                               '#999999') # colors for each cluster
 ```
 
  HCPC Analysis for PB Cluster 1
@@ -130,9 +133,7 @@ f <- fviz_pca_ind(PCA.f.1.PB.1, geom.ind = "point", pointshape = 21,
              legend.title = "Year") +
   ggtitle("2D PCA-plot from trip variables") +
   theme(plot.title = element_text(hjust = 0.5)) +
-  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
-                               '#ff7f00','#ffff33','#a65628','#f781bf',
-                               '#999999'))
+  ggplot2::scale_color_manual(values = clrs)
 print(f)
 
 ggsave(filename = "../figures/PCAGroups_PB1.pdf",
@@ -194,7 +195,7 @@ res.hcpc.1.PB.1 <- HCPC(res.pca.f.1.PB.1,
 
 f <- fviz_dend(res.hcpc.1.PB.1, 
           cex = 0.7,                     # Label size
-          palette = "jco",               # Color palette see ?ggpubr::ggpar
+          palette = clrs,               # Color palette see ?ggpubr::ggpar
           rect = TRUE, rect_fill = TRUE, # Add rectangle around groups
           rect_border = "jco",           # Rectangle color
           labels_track_height = 0.8,      # Augment the room for labels
@@ -210,7 +211,7 @@ ggsave(filename = "../figures/PCA_HCPC_PB1.pdf",
 f <- fviz_cluster(res.hcpc.1.PB.1,
              repel = TRUE,            # Avoid label overlapping
              show.clust.cent = TRUE, # Show cluster centers
-             palette = "jco",         # Color palette see ?ggpubr::ggpar
+             palette = clrs,         # Color palette see ?ggpubr::ggpar
              ggtheme = theme_minimal(),
              main = "Factor map"
              )
@@ -252,10 +253,7 @@ system.time({
 })
 
 
-# various parameter plots
-clrs <- c('#e41a1c','#377eb8','#4daf4a','#984ea3',
-                               '#ff7f00','#ffff33','#a65628','#f781bf',
-                               '#999999') # colors for each cluster
+
 
 # Plot all mu 
 pdf("../figures/PostMu_PB1.pdf")
@@ -438,9 +436,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
   xlab = "SubClusters PB1",
   ylab = "Niche Size") +
-  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
-                               '#ff7f00','#ffff33','#a65628','#f781bf',
-                               '#999999'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/NicheStrategies_PB1.pdf",
        plot = plt.niche,
@@ -454,139 +450,3 @@ sum.PB1 <- summary_table(f.PCAdata.PB.1, our_summary1)
 sum.PB1
 ```
 
-```{r}
-
-#Load the substructure data
-data4boxplot <- read.csv('../results/PB_Cluster1.csv')
-
-#Substructure, Two main variables for the first 3 PCs
-#PC1
-#
-plt.niche <- ggbetweenstats(
-  data = data4boxplot,
-  x = IntCluster,
-  y = MaxLat_degrees,
-  pairwise.display = "none",
-  #type = "rb",
-  #box.args = list(width = 0),
-  #point.args = list(alpha = 0),
-    xlab = "SubClusters PB1",
-  ylab = "MaxLat_degrees") +
-  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
-                               '#ff7f00','#ffff33','#a65628','#f781bf',
-                               '#999999'))
-
-ggsave(filename = "../figures/PBC1_maxlat.pdf",
-       plot = plt.niche,
-       device = cairo_pdf)
-
-print(plt.niche)
-
-#
-plt.niche <- ggbetweenstats(
-  data = data4boxplot,
-  x = IntCluster,
-  y = MesoEcoProportionNorthCPac,
-  pairwise.display = "none",
-  #type = "rb",
-  #box.args = list(width = 0),
-  #point.args = list(alpha = 0),
-    xlab = "SubClusters PB1",
-  ylab = "MesoEcoProportionNorthCPac") +
-  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
-                               '#ff7f00','#ffff33','#a65628','#f781bf',
-                               '#999999'))
-
-ggsave(filename = "../figures/PBC1_MesoEcoProportionNorthCPac.pdf",
-       plot = plt.niche,
-       device = cairo_pdf)
-
-print(plt.niche)
-
-#PC2
-#
-plt.niche <- ggbetweenstats(
-  data = data4boxplot,
-  x = IntCluster,
-  y = MinLon_degrees,
-  pairwise.display = "none",
-  #type = "rb",
-  #box.args = list(width = 0),
-  #point.args = list(alpha = 0),
-    xlab = "SubClusters PB1",
-  ylab = "MinLon_degrees") +
-  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
-                               '#ff7f00','#ffff33','#a65628','#f781bf',
-                               '#999999'))
-
-ggsave(filename = "../figures/PBC1MinLon_degrees.pdf",
-       plot = plt.niche,
-       device = cairo_pdf)
-
-print(plt.niche)
-
-#
-plt.niche <- ggbetweenstats(
-  data = data4boxplot,
-  x = IntCluster,
-  y = MesoEcoProportionCAC,
-   pairwise.display = "none",
-  #type = "rb",
-  #box.args = list(width = 0),
-  #point.args = list(alpha = 0),
-    xlab = "SubClusters PB1",
-  ylab = "MesoEcoProportionCAC") +
-  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
-                               '#ff7f00','#ffff33','#a65628','#f781bf',
-                               '#999999'))
-
-ggsave(filename = "../figures/PBC1_MesoEcoProportionCAC.pdf",
-       plot = plt.niche,
-       device = cairo_pdf)
-
-print(plt.niche)
-
-#PC3
-#
-plt.niche <- ggbetweenstats(
-  data = data4boxplot,
-  x = IntCluster,
-  y = DeepDayForageDivesMedian_m,
-  pairwise.display = "none",
-  #type = "rb",
-  #box.args = list(width = 0),
-  #point.args = list(alpha = 0),
-    xlab = "SubClusters PB1",
-  ylab = "DeepDayForageDivesMedian_m") +
-  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
-                               '#ff7f00','#ffff33','#a65628','#f781bf',
-                               '#999999'))
-
-ggsave(filename = "../figures/PBC1_DeepDayForageDivesMedian_m.pdf",
-       plot = plt.niche,
-       device = cairo_pdf)
-
-print(plt.niche)
-
-#
-plt.niche <- ggbetweenstats(
-  data = data4boxplot,
-  x = IntCluster,
-  y = Mean_Depth_m,
-  pairwise.display = "none",
-  #type = "rb",
-  #box.args = list(width = 0),
-  #point.args = list(alpha = 0),
-    xlab = "SubClusters PB1",
-  ylab = "Mean_Depth_m") +
-  ggplot2::scale_color_manual(values = c('#e41a1c','#377eb8','#4daf4a','#984ea3',
-                               '#ff7f00','#ffff33','#a65628','#f781bf',
-                               '#999999'))
-
-ggsave(filename = "../figures/PBC1_Mean_Depth_m.pdf",
-       plot = plt.niche,
-       device = cairo_pdf)
-
-print(plt.niche)
-
-```
