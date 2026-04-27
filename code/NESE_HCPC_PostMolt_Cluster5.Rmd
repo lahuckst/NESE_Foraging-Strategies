@@ -63,6 +63,14 @@ our_summary1 <-
 # Import the data
 f.PCAdata.PM <- readRDS("../data/f.PCAdata.PM.rds")
 
+# various parameter plots
+clrs <- c("#d73027",
+          "#fc8d59",
+          "#fee090",
+          "#e0f3f8",
+          "#91bfdb",
+          "#4575b4") # colors for each cluster
+
 ```
 
 PM Cluster 5
@@ -187,7 +195,7 @@ res.hcpc.1.PM.5 <- HCPC(res.pca.f.1.PM.5,
 
 f <- fviz_dend(res.hcpc.1.PM.5, 
           cex = 0.7,                     # Label size
-          palette = "jco",               # Color palette see ?ggpubr::ggpar
+          palette = clrs,               # Color palette see ?ggpubr::ggpar
           rect = TRUE, rect_fill = TRUE, # Add rectangle around groups
           rect_border = "jco",           # Rectangle color
           labels_track_height = 0.8,      # Augment the room for labels
@@ -202,7 +210,7 @@ ggsave(filename = "../figures/PCA_HCPC_PM5.pdf",
 fviz_cluster(res.hcpc.1.PM.5,
              repel = TRUE,            # Avoid label overlapping
              show.clust.cent = TRUE, # Show cluster centers
-             palette = "jco",         # Color palette see ?ggpubr::ggpar
+             palette = clrs,         # Color palette see ?ggpubr::ggpar
              ggtheme = theme_minimal(),
              main = "Factor map"
              )
@@ -242,11 +250,7 @@ system.time({
 })
 
 
-# various parameter plots
-clrs <- c("#d7191c",
-          "#fdae61",
-          "#abd9e9",
-          "#2c7bb6") # colors for each cluster
+
 
 # Plot all mu 
 pdf("../figures/PostMu_PM5.pdf")
@@ -386,7 +390,8 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
   xlab = "PMC5 SubClusters",
   ylab = "Niche Size"
-  )
+  )  +
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/NicheStrategies_PMC5.pdf",
        plot = plt.niche,
@@ -420,7 +425,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM%",
   ylab = "MesoEcoProportionSubArcticPac") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3','#e7298a'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC5_MesoEcoProportionSubArcticPac.pdf",
        plot = plt.niche,
@@ -439,7 +444,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM5",
   ylab = "MinLon_degrees") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3','#e7298a'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC5_MinLon_degrees.pdf",
        plot = plt.niche,
@@ -459,7 +464,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM5",
   ylab = "Pct_BenthicDives") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3','#e7298a'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC5_Pct_BenthicDives.pdf",
        plot = plt.niche,
@@ -478,7 +483,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM5",
   ylab = "Mean_Duration_sec") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3','#e7298a'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC5_Mean_Duration_sec.pdf",
        plot = plt.niche,
@@ -498,7 +503,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM5",
   ylab = "Pct_TransitDives") +
- ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3','#e7298a'))
+ ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC5_Pct_TransitDives.pdf",
        plot = plt.niche,
@@ -517,7 +522,7 @@ plt.niche <- ggbetweenstats(
   #point.args = list(alpha = 0),
     xlab = "SubClusters PM5",
   ylab = "Mean_Duration_sd") +
-  ggplot2::scale_color_manual(values = c('#1b9e77','#d95f02','#7570b3','#e7298a'))
+  ggplot2::scale_color_manual(values = clrs)
 
 ggsave(filename = "../figures/PMC5_Mean_Duration_sd.pdf",
        plot = plt.niche,

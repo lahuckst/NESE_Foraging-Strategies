@@ -305,7 +305,7 @@ round(over.mean.PB, 2)
 
 # Credibility Intervals
 over.cred.PB <- apply(over.stat.PB*100, c(1:2, 4), quantile, prob = c(.025, .975), na.rm = TRUE)
-round(over.cred.PB[,,,1]) # display alpha = .95 niche region
+round(over.cred.PB[,,,1], digits = 2) # display alpha = .95 niche region
 
 # Overlap plot
 #clrs <- c("#1b9e77", "#d95f02", "#7570b3") # colors for each cluster
