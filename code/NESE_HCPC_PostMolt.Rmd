@@ -197,7 +197,7 @@ f <- fviz_dend(res.hcpc.1.PM,
           cex = 0.7,                     # Label size
           palette = clrs,               # Color palette see ?ggpubr::ggpar
           rect = TRUE, rect_fill = TRUE, # Add rectangle around groups
-          rect_border = clrs,           # Rectangle color
+          rect_border = "jco",           # Rectangle color
           labels_track_height = 0.8,      # Augment the room for labels
           main = "Cluster analysis for all females - PM Trip"
                     )
@@ -321,7 +321,7 @@ round(over.mean.PM, 2)
 
 # Credibility Intervals
 over.cred.PM <- apply(over.stat.PM*100, c(1:2, 4), quantile, prob = c(.025, .975), na.rm = TRUE)
-round(over.cred.PM[,,,1]) # display alpha = .95 niche region
+round(over.cred.PM[,,,1],2) # display alpha = .95 niche region
 
 # Overlap plot
 #clrs <- c("#1b9e77", "#d95f02", "#7570b3") # colors for each cluster
