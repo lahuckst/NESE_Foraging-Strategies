@@ -48,6 +48,10 @@ PCAdata <- data_iso[,col4PCA]
 PCAdata$ProcedureYear <- as.factor(PCAdata$ProcedureYear)
 m.PCAdata <- dplyr::filter(PCAdata, Sex == "Male") # Extract the data just for males , 48 males
 m.PCAdata.PM <- dplyr::filter(m.PCAdata, Trip == "PostMolt")
+
+clrs <- c("#aa6fac",
+          "#4eb15e",
+          "#168ece")
 ```
 
 Analysis for Male NESE  Post-Moult
@@ -86,7 +90,7 @@ m.PCAdata.1.PM$ClustersPM <-  cutree(hc.m.PM, k =3)
 f <- fviz_dend(hc.m.PM, 
                k =3,
                cex = 0.7,                     # Label size
-               palette = "jco",               # Color palette see ?ggpubr::ggpar
+               palette = clrs,               # Color palette see ?ggpubr::ggpar
                rect = TRUE, rect_fill = TRUE, # Add rectangle around groups
                rect_border = "jco",           # Rectangle color
                labels_track_height = 0.8,      # Augment the room for labels
@@ -101,7 +105,7 @@ ggsave(filename = "../figures/HC_Males_PM.pdf",
 f <- fviz_cluster(list(data = m.PCAdata.1.PM, cluster = fit),
                   repel = TRUE,            # Avoid label overlapping
                   show.clust.cent = TRUE, # Show cluster centers
-                  palette = "jco",         # Color palette see ?ggpubr::ggpar
+                  palette = clrs,         # Color palette see ?ggpubr::ggpar
                   ggtheme = theme_minimal(),
                   main = "Cluster PM Males")
 print(f)
@@ -109,8 +113,13 @@ ggsave(filename = "../figures/HC_MalesPM_2D.pdf",
        plot = f,
        device = cairo_pdf)
 
-#Add the clusters to the original dataset
+## After the PERMANOVA analysis, we can confirm that PMC3 corresponds to PBC2, so we are going to change the names accordingly 
 
+m.PCAdata.1.PM$ClustersPM[which(m.PCAdata.1.PM$ClustersPM == 1 )] <- 'Cluster 1'
+m.PCAdata.1.PM$ClustersPM[which(m.PCAdata.1.PM$ClustersPM == 2 )] <- 'Cluster 3'
+m.PCAdata.1.PM$ClustersPM[which(m.PCAdata.1.PM$ClustersPM == 3 )] <- 'Cluster 2'
+
+#
 write.csv(m.PCAdata.1.PM,'../results/Males_ClustersPM.csv')
 
 ################################################################################################################################################################################################################
@@ -132,12 +141,6 @@ system.time({
 })
 
 
-# various parameter plots
-clrs <- c("#e41a1c",
-          "#377eb8",
-          "#4daf4a",
-          "#984ea3",
-          "#ff7f00") # colors for each cluster
 
 # Plot all mu 
 pdf("../figures/PostMu_MalesPM.pdf")
@@ -246,9 +249,9 @@ colnames(Olap.PM) <- c('Cluster 1',
                         'Cluster 2',
                         'Cluster 3')
 
-rownames(Olap.PM) <- c('Cluster 2',
-                        'Cluster 3',
-                        'Cluster 4')
+rownames(Olap.PM) <- c('Cluster 1',
+                        'Cluster 2',
+                        'Cluster 3')
 
 for (sc in 1:3){
   for (sc2 in 1:3){
@@ -273,12 +276,14 @@ plt.niche <- ggbetweenstats(
   data = PM.size2,
   x = Cluster,
   y = Niche_Size,
-  type = "rb",
-  box.args = list(width = 0),
-  point.args = list(alpha = 0),
+  pairwise.display = "none",
   xlab = "Clusters",
   ylab = "Niche Size"
-  )
+  ) +
+  ggplot2::scale_color_manual(values = clrs)
+
+print(plt.niche)
+
 print(plt.niche)
 ggsave(filename = "../figures/NicheStrategies_MalesPM.pdf",
        plot = plt.niche,
