@@ -277,11 +277,7 @@ plt.niche <- ggbetweenstats(
   ggplot2::scale_color_manual(values = clrs)
 print(plt.niche)
 
-<<<<<<< HEAD
 
-
-=======
->>>>>>> ddf83a596b5092eabe1fccbb0321b3a990cbcc41
 ggsave(filename = "../figures/NicheStrategies_MalesPB.pdf",
        plot = plt.niche,
        device = cairo_pdf)
