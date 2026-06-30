@@ -115,7 +115,22 @@ ggsave(filename = "../figures/HC_MalesAPB_2D.pdf",
 
 #Add the clusters to the original dataset
 
+m.PCAdata.PB.2 <- merge(m.PCAdata.1.PB, m.PCAdata.PB, by = 'row.names', all = TRUE)
+
+#
 write.csv(m.PCAdata.1.PB,'../results/Males_ClustersPB.csv')
+write.csv(m.PCAdata.PB.2,'../results/Males_ClustersPB_raw.csv')
+# Data Summary by clusters
+
+PB.Males.Summary <- m.PCAdata.PB.2 %>% 
+   group_by(ClustersPB) %>%
+   summarise(across(
+     .cols = c(d13C.y, d15N.y, StandardLength_cm.y),
+     .fns = list(mean = mean, sd = sd),
+     na.rm = TRUE
+   ))
+
+PB.Males.Summary 
 
 ################################################################################################################################################################################################################
 ```

@@ -119,9 +119,22 @@ m.PCAdata.1.PM$ClustersPM[which(m.PCAdata.1.PM$ClustersPM == 1 )] <- 'Cluster 1'
 m.PCAdata.1.PM$ClustersPM[which(m.PCAdata.1.PM$ClustersPM == 2 )] <- 'Cluster 3'
 m.PCAdata.1.PM$ClustersPM[which(m.PCAdata.1.PM$ClustersPM == 3 )] <- 'Cluster 2'
 
+m.PCAdata.PM.2 <- merge(m.PCAdata.1.PM, m.PCAdata.PM, by = 'row.names', all = TRUE)
+
 #
 write.csv(m.PCAdata.1.PM,'../results/Males_ClustersPM.csv')
+write.csv(m.PCAdata.PM.2,'../results/Males_ClustersPM_raw.csv')
+# Data Summary by clusters
 
+PM.Males.Summary <- m.PCAdata.PM.2 %>% 
+   group_by(ClustersPM) %>%
+   summarise(across(
+     .cols = c(d13C.y, d15N.y, StandardLength_cm.y),
+     .fns = list(mean = mean, sd = sd),
+     na.rm = TRUE
+   ))
+
+PM.Males.Summary 
 ################################################################################################################################################################################################################
 ```
 Niche analysis 
@@ -291,4 +304,3 @@ ggsave(filename = "../figures/NicheStrategies_MalesPM.pdf",
 
 
 ```
-
