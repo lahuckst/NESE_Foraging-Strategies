@@ -50,8 +50,8 @@ m.PCAdata <- dplyr::filter(PCAdata, Sex == "Male") # Extract the data just for m
 m.PCAdata.PM <- dplyr::filter(m.PCAdata, Trip == "PostMolt")
 
 clrs <- c("#aa6fac",
-          "#4eb15e",
-          "#168ece")
+          "#168ece",
+          "#4eb15e")
 ```
 
 Analysis for Male NESE  Post-Moult

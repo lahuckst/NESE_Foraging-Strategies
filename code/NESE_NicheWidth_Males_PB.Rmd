@@ -50,8 +50,9 @@ m.PCAdata <- dplyr::filter(PCAdata, Sex == "Male") # Extract the data just for m
 m.PCAdata.PB <- dplyr::filter(m.PCAdata, Trip == "PostBreeding")
 
 clrs <- c("#aa6fac",
-          "#4eb15e",
-          "#168ece")
+          "#168ece",
+          "#4eb15e")
+
 ```
 
 Analysis for Male NESE  PostBreeding
@@ -114,6 +115,9 @@ ggsave(filename = "../figures/HC_MalesAPB_2D.pdf",
        device = cairo_pdf)
 
 #Add the clusters to the original dataset
+m.PCAdata.1.PB$ClustersPB[which(m.PCAdata.1.PB$ClustersPB == 1 )] <- 'Cluster 1'
+m.PCAdata.1.PB$ClustersPB[which(m.PCAdata.1.PB$ClustersPB == 2 )] <- 'Cluster 3'
+m.PCAdata.1.PB$ClustersPB[which(m.PCAdata.1.PB$ClustersPB == 3 )] <- 'Cluster 2'
 
 m.PCAdata.PB.2 <- merge(m.PCAdata.1.PB, m.PCAdata.PB, by = 'row.names', all = TRUE)
 

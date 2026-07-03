@@ -30,11 +30,11 @@ PM <- NESE_IsotopesAll[which(NESE_IsotopesAll$Trip=='PostMolt'),]
 ```{r}
 # Define the colour palette following the pattern from the paper
 cluster_cols <- c("Males_PBC1" = "#aa6fac",
-                  "Males_PBC2" = "#4eb15e",
-                  "Males_PBC3" = "#168ece",
-                  "Females_PMC1" = "#7570b3",
-                  "Females_PMC2" = "#1b9e77",
-                  "Females_PMC3" = "#d95f02")
+                  "Males_PBC2" = "#168ece",
+                  "Males_PBC3" = "#4eb15e",
+                  "Females_PBC1" = "#7570b3",
+                  "Females_PBC2" = "#1b9e77",
+                  "Females_PBC3" = "#d95f02")
 
 # Plots the data for both isotopes for males and females, including the MCPs
 MPC.PB <- ggplot(PB, aes(d13C, d15N, 
@@ -146,8 +146,8 @@ overlap.PB
 ```{r}
 # Define the colour palette following the pattern from the paper
 cluster_cols <- c("Males_PMC1" = "#aa6fac",
-                  "Males_PMC2" = "#4eb15e",
-                  "Males_PMC3" = "#168ece",
+                  "Males_PMC2" = "#168ece",
+                  "Males_PMC3" = "#4eb15e",
                   "Females_PMC1" = "#7571b2",
                   "Females_PMC2" = "#1c9f79",
                   "Females_PMC3" = "#d96116",
