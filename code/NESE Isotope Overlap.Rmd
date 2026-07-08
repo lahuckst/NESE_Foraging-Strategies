@@ -121,6 +121,7 @@ for(i in seq_len(nrow(overlap))){
   }
 }
 
+overlap
 # Plot the grid of overlap
 overlap.PB <- ggplot(overlap,
        aes(cluster1, cluster2, fill = percent_overlap_cluster2)) +
@@ -246,9 +247,10 @@ for(i in seq_len(nrow(overlap))){
 }
 
 
-# Need to manually vhange the overlap for PMC5
+# Need to manually cvhange the overlap for PMC5
 overlap$percent_overlap_cluster1[37] <- NA
 overlap$percent_overlap_cluster2[37] <- NA
+overlap
 
 # Plot the grid of overlap
 overlap.PM <- ggplot(overlap,
