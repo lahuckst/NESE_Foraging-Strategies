@@ -50,8 +50,9 @@ m.PCAdata <- dplyr::filter(PCAdata, Sex == "Male") # Extract the data just for m
 m.PCAdata.PB <- dplyr::filter(m.PCAdata, Trip == "PostBreeding")
 
 clrs <- c("#aa6fac",
-          "#4eb15e",
-          "#168ece")
+          "#168ece",
+          "#4eb15e")
+
 ```
 
 Analysis for Male NESE  PostBreeding
@@ -87,6 +88,15 @@ rect.hclust(hc.m.PB, k=3, border="red")
 # Add the Cluster to the original table
 m.PCAdata.1.PB$ClustersPB <-  cutree(hc.m.PB, k =3)
 
+m.PCAdata.1.PB$ClustersPB[which(m.PCAdata.1.PB$ClustersPB == 1 )] <- 'Cluster 2'
+m.PCAdata.1.PB$ClustersPB[which(m.PCAdata.1.PB$ClustersPB == 2 )] <- 'Cluster 1'
+m.PCAdata.1.PB$ClustersPB[which(m.PCAdata.1.PB$ClustersPB == 3 )] <- 'Cluster 3'
+
+m.PCAdata.1.PB$ClustersPB[which(m.PCAdata.1.PB$ClustersPB == 'Cluster 1')] <- 1
+m.PCAdata.1.PB$ClustersPB[which(m.PCAdata.1.PB$ClustersPB == 'Cluster 2' )] <- 2
+m.PCAdata.1.PB$ClustersPB[which(m.PCAdata.1.PB$ClustersPB == 'Cluster 3' )] <- 3
+
+
 f <- fviz_dend(hc.m.PB, 
                k =3,
                cex = 0.7,                     # Label size
@@ -102,20 +112,36 @@ ggsave(filename = "../figures/HC_Males_PB.pdf",
        device = cairo_pdf)
 
 # Bi-space
-f <- fviz_cluster(list(data = m.PCAdata.1.PB, cluster = fit),
-                  repel = TRUE,            # Avoid label overlapping
-                  show.clust.cent = TRUE, # Show cluster centers
-                  palette = clrs,         # Color palette see ?ggpubr::ggpar
-                  ggtheme = theme_minimal(),
-                  main = "Cluster PB Males")
-print(f)
-ggsave(filename = "../figures/HC_MalesAPB_2D.pdf",
-       plot = f,
-       device = cairo_pdf)
+#f <- fviz_cluster(list(data = m.PCAdata.1.PB, cluster = fit),
+#                  repel = TRUE,            # Avoid label overlapping
+#                  show.clust.cent = TRUE, # Show cluster centers
+#                  palette = clrs,         # Color palette see ?ggpubr::ggpar
+#                  ggtheme = theme_minimal(),
+#                  main = "Cluster PB Males")
+#print(f)
+#ggsave(filename = "../figures/HC_MalesAPB_2D.pdf",
+#       plot = f,
+#       device = cairo_pdf)
+#f
 
-#Add the clusters to the original dataset
 
+
+m.PCAdata.PB.2 <- merge(m.PCAdata.1.PB, m.PCAdata.PB, by = 'row.names', all = TRUE)
+
+#
 write.csv(m.PCAdata.1.PB,'../results/Males_ClustersPB.csv')
+write.csv(m.PCAdata.PB.2,'../results/Males_ClustersPB_raw.csv')
+# Data Summary by clusters
+
+PB.Males.Summary <- m.PCAdata.PB.2 %>% 
+   group_by(ClustersPB) %>%
+   summarise(across(
+     .cols = c(d13C.y, d15N.y, StandardLength_cm.y),
+     .fns = list(mean = mean, sd = sd),
+     na.rm = TRUE
+   ))
+
+PB.Males.Summary 
 
 ################################################################################################################################################################################################################
 ```

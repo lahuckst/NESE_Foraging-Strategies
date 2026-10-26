@@ -29,7 +29,7 @@ library(ggstatsplot)
 library(dispRity)
 library(NbClust)
 library(pvclust)
-
+library(dendextend)
 
 
 ```
@@ -50,8 +50,8 @@ m.PCAdata <- dplyr::filter(PCAdata, Sex == "Male") # Extract the data just for m
 m.PCAdata.PM <- dplyr::filter(m.PCAdata, Trip == "PostMolt")
 
 clrs <- c("#aa6fac",
-          "#4eb15e",
-          "#168ece")
+          "#168ece",
+          "#4eb15e")
 ```
 
 Analysis for Male NESE  Post-Moult
@@ -87,41 +87,59 @@ rect.hclust(hc.m.PM, k=3, border="red")
 # Add the Cluster to the original table
 m.PCAdata.1.PM$ClustersPM <-  cutree(hc.m.PM, k =3)
 
-f <- fviz_dend(hc.m.PM, 
-               k =3,
-               cex = 0.7,                     # Label size
-               palette = clrs,               # Color palette see ?ggpubr::ggpar
-               rect = TRUE, rect_fill = TRUE, # Add rectangle around groups
-               rect_border = "jco",           # Rectangle color
-               labels_track_height = 0.8,      # Augment the room for labels
-               main = "Cluster PM - Males")
-
-print(f)
-ggsave(filename = "../figures/HC_Males_PM.pdf",
-       plot = f,
-       device = cairo_pdf)
-
-# Bi-space
-f <- fviz_cluster(list(data = m.PCAdata.1.PM, cluster = fit),
-                  repel = TRUE,            # Avoid label overlapping
-                  show.clust.cent = TRUE, # Show cluster centers
-                  palette = clrs,         # Color palette see ?ggpubr::ggpar
-                  ggtheme = theme_minimal(),
-                  main = "Cluster PM Males")
-print(f)
-ggsave(filename = "../figures/HC_MalesPM_2D.pdf",
-       plot = f,
-       device = cairo_pdf)
-
 ## After the PERMANOVA analysis, we can confirm that PMC3 corresponds to PBC2, so we are going to change the names accordingly 
 
 m.PCAdata.1.PM$ClustersPM[which(m.PCAdata.1.PM$ClustersPM == 1 )] <- 'Cluster 1'
 m.PCAdata.1.PM$ClustersPM[which(m.PCAdata.1.PM$ClustersPM == 2 )] <- 'Cluster 3'
 m.PCAdata.1.PM$ClustersPM[which(m.PCAdata.1.PM$ClustersPM == 3 )] <- 'Cluster 2'
 
+m.PCAdata.1.PM$ClustersPM[which(m.PCAdata.1.PM$ClustersPM == 'Cluster 1')] <- 1
+m.PCAdata.1.PM$ClustersPM[which(m.PCAdata.1.PM$ClustersPM == 'Cluster 2' )] <- 2
+m.PCAdata.1.PM$ClustersPM[which(m.PCAdata.1.PM$ClustersPM == 'Cluster 3' )] <- 3
+
+
+dend <- as.dendrogram(hc.m.PM)
+
+dend <- color_branches(
+  dend,
+  k = 3,
+  col = clrs
+)
+
+f1 <- fviz_dend(
+  dend,
+  rect = TRUE,
+  rect_border = clrs,
+  cex = 0.7,
+  main = "Cluster PM - Males"
+)
+
+
+f1
+
+ggsave(filename = "../figures/HC_Males_PM.pdf",
+       plot = f1,
+       device = cairo_pdf)
+
+
+
+
+m.PCAdata.PM.2 <- merge(m.PCAdata.1.PM, m.PCAdata.PM, by = 'row.names', all = TRUE)
+
 #
 write.csv(m.PCAdata.1.PM,'../results/Males_ClustersPM.csv')
+write.csv(m.PCAdata.PM.2,'../results/Males_ClustersPM_raw.csv')
+# Data Summary by clusters
 
+PM.Males.Summary <- m.PCAdata.PM.2 %>% 
+   group_by(ClustersPM) %>%
+   summarise(across(
+     .cols = c(d13C.y, d15N.y, StandardLength_cm.y),
+     .fns = list(mean = mean, sd = sd),
+     na.rm = TRUE
+   ))
+
+PM.Males.Summary 
 ################################################################################################################################################################################################################
 ```
 Niche analysis 
@@ -291,4 +309,3 @@ ggsave(filename = "../figures/NicheStrategies_MalesPM.pdf",
 
 
 ```
-
