@@ -1,0 +1,2 @@
+analysis,n,n_variables,n_PCs,cumulative_variance,provisional_k,minimum_cluster_n,mean_silhouette,stability
+AllFemales,180,19,5,0.7586916997920723,2,89,0.2688380502494681,0.9096220404097553
