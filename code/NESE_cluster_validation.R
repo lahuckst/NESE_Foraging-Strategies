@@ -33,7 +33,7 @@ cluster_vars <- c(
 external_vars <- c("d13C", "d15N", "ProcedureYear")
 K_MIN <- 2
 K_MAX <- 10
-N_BOOT <- 200
+N_BOOT <- 500
 BOOT_FRACTION <- 0.80
 MIN_CLUSTER_N <- 8
 VARIANCE_TARGET <- 0.75

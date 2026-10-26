@@ -1,2 +1,2 @@
 analysis,n,n_variables,n_PCs,cumulative_variance,provisional_k,minimum_cluster_n,mean_silhouette,stability
-PostMolt,87,19,6,0.7863227819415975,2,33,0.2761462279077177,0.81928950318426
+PostMolt,87,19,6,0.7863227819415975,2,33,0.2761462279077177,0.8273802821382199
