@@ -307,6 +307,7 @@ write_csv(
              pca_full$pca$rotation, check.names = FALSE),
   file.path(OUTPUT_DIR, "PCA_loadings_full.csv")
 )
+<<<<<<< HEAD
 #Screeplot
 n_scree <- min(10, length(pca_full$pca$sdev))
 
@@ -320,6 +321,8 @@ abline(h = 1, col="red", lty=5)
 legend("topright", legend=c("Eigenvalue = 1"),
        col=c("red"), lty=5, cex=0.6)
 
+=======
+>>>>>>> 43062d9d2d4accff6c3910972d3abde002d15f00
 
 p_var <- ggplot(pca_summary, aes(x = PC, y = cumulative_variance)) +
   geom_line() + geom_point() +
