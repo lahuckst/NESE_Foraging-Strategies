@@ -307,7 +307,7 @@ write_csv(
              pca_full$pca$rotation, check.names = FALSE),
   file.path(OUTPUT_DIR, "PCA_loadings_full.csv")
 )
-<<<<<<< HEAD
+
 #Screeplot
 n_scree <- min(10, length(pca_full$pca$sdev))
 
@@ -321,8 +321,6 @@ abline(h = 1, col="red", lty=5)
 legend("topright", legend=c("Eigenvalue = 1"),
        col=c("red"), lty=5, cex=0.6)
 
-=======
->>>>>>> 43062d9d2d4accff6c3910972d3abde002d15f00
 
 p_var <- ggplot(pca_summary, aes(x = PC, y = cumulative_variance)) +
   geom_line() + geom_point() +
@@ -340,6 +338,7 @@ ggsave(file.path(FIGURE_DIR, "PCA_cumulative_variance.pdf"), p_var,
 diagnostic_rows <- list()
 fit_objects <- list()
 counter <- 1L
+PC_CANDIDATES <- c(4,5,6)
 
 for (npc in PC_CANDIDATES) {
   if (npc >= ncol(pca_full$pca$x)) next
@@ -411,13 +410,15 @@ isotope_sensitivity <- dplyr::bind_rows(isotope_sensitivity)
 write_csv(isotope_sensitivity,
           file.path(OUTPUT_DIR, "isotope_exclusion_sensitivity.csv"))
 ```
+
+
+```{r}
 # ------------------------- CHOOSE FINAL SOLUTION ------------------------------
-# Provisional default: 5 PCs and k=3, matching the original workflow, but this
-# is NOT automatically endorsed. Review diagnostics, minimum sizes, stability,
+#Review diagnostics, minimum sizes, stability,
 # isotope sensitivity, year structure and ecological interpretability before
 # setting FINAL_N_PC and FINAL_K below.
-FINAL_N_PC <- 5
-FINAL_K <- 3
+FINAL_N_PC <- 4
+FINAL_K <- 4
 
 if (!FINAL_N_PC %in% PC_CANDIDATES) {
   stop("FINAL_N_PC must be one of PC_CANDIDATES.")
@@ -468,6 +469,8 @@ p_scores <- ggplot(score_plot_data,
   theme_minimal()
 ggsave(file.path(FIGURE_DIR, "final_PCA_scores_by_cluster.pdf"), p_scores,
        width = 7, height = 5)
+```
+```{r}
 
 # --------------------------- CLUSTER PROFILES --------------------------------
 # Descriptive summaries are used to interpret cluster profiles, not to claim
@@ -493,7 +496,10 @@ cluster_sizes <- pb_final %>%
   dplyr::mutate(proportion = n / sum(n),
                 below_minimum = n < MIN_CLUSTER_N)
 write_csv(cluster_sizes, file.path(OUTPUT_DIR, "final_cluster_sizes.csv"))
+```
 
+
+```{r}
 # Exploratory Kruskal-Wallis tests per variable with Benjamini-Hochberg
 # correction. These describe association with the clusters defined using these
 # same variables; they are NOT independent validation tests.
@@ -535,6 +541,10 @@ p_profiles <- ggplot(plot_data, aes(x = cluster, y = value, colour = cluster)) +
         axis.text.x = element_text(angle = 45, hjust = 1))
 ggsave(file.path(FIGURE_DIR, "cluster_profiles_all_variables.pdf"),
        p_profiles, width = 13, height = 10)
+
+```
+
+```{r}
 
 # ----------------------------- YEAR STRUCTURE --------------------------------
 # Cluster-year association is a diagnostic, not a causal test. If trips span
