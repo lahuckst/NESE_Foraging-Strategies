@@ -1,0 +1,499 @@
+# =============================================================================
+# NESE_HCPC_PostBreeding_revised.R
+# Revised analysis pipeline addressing the Proceedings B reviewer comments
+#
+# Main changes:
+#   * Explicit variable names and ID checks (no fragile column-number indexing)
+#   * No inconsistent varimax overwrite of PCA variable coordinates
+#   * Reproducible PCA and clustering with saved settings/seeds
+#   * Candidate k comparison using silhouette, bootstrap stability and cluster sizes
+#   * Sensitivity analyses for number of PCs and exclusion of isotope variables
+#   * Cluster profiles and adjusted exploratory tests, clearly separated from
+#     independent validation
+#   * No nicheROVER modelling of potentially undersized clusters by default
+#   * No treating posterior draws as biological replicates
+#
+# IMPORTANT:
+#   1. Check DATA_FILE and OUTPUT_DIR for your project structure.
+#   2. This script treats each row as one analysis unit. If TOPPID occurs more
+#      than once in PostBreeding, resolve repeated trips/observations before
+#      treating rows as independent. The script reports duplicates and stops
+#      unless ALLOW_REPEATED_ROWS is explicitly changed to TRUE.
+#   3. Review variable definitions and distribution/transformations before
+#      interpreting cluster profiles.
+# =============================================================================
+
+set.seed(20261027)
+
+# ------------------------------- USER SETTINGS -------------------------------
+DATA_FILE <- "../data/f.PCAdata.1.rds"
+OUTPUT_DIR <- "../results/PostBreeding_revised"
+FIGURE_DIR <- "../figures/PostBreeding_revised"
+
+ID_VAR <- "TOPPID"
+TRIP_VAR <- "Trip"
+TRIP_VALUE <- "PostBreeding"
+YEAR_VAR <- "ProcedureYear"
+
+# These are the 21 variables used by the original Post-Breeding PCA.
+# Check these names against the source data and retain only variables justified
+# by the study question. Variables are scaled before PCA.
+ANALYSIS_VARS <- c(
+  "d13C", "d15N",
+  "MaxLat_degrees", "MinLon_degrees",
+  "MedianDistToContShelf_km", "SdDistContShelf_km",
+  "MesoEcoProportionShelf", "MesoEcoProportionCAC",
+  "MesoEcoProportionSubArcticPac", "MesoEcoProportionNorthCPac",
+  "Mean_Depth_m", "Mean_Depth_sd",
+  "Mean_Duration_sec", "Mean_Duration_sd",
+  "Pct_TransitDives", "Pct_ForagingDives", "Pct_DriftDives",
+  "Pct_BenthicDives", "PctTripDiving",
+  "DeepDayForageDivesMedian_m", "DeepNightForageDivesMedian_m"
+)
+ISOTOPE_VARS <- c("d13C", "d15N")
+
+# Main candidate range. Given the earlier diagnostics, inspect k = 2, 3, 4.
+K_CANDIDATES <- 2:4
+PC_CANDIDATES <- c(4, 5, 6)
+BOOTSTRAP_REPS <- 500
+MIN_CLUSTER_N <- 10
+ALLOW_REPEATED_ROWS <- FALSE
+
+# Clustering method for primary solution
+HC_METHOD <- "ward.D2"
+
+# ------------------------------ SET UP OUTPUTS -------------------------------
+dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+dir.create(FIGURE_DIR, recursive = TRUE, showWarnings = FALSE)
+
+required_packages <- c("dplyr", "ggplot2", "cluster", "factoextra", "FactoMineR",
+                       "fpc", "mclust", "readr", "tibble", "tidyr")
+missing_packages <- required_packages[
+  !vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)
+]
+if (length(missing_packages)) {
+  stop("Install required packages first: ",
+       paste(missing_packages, collapse = ", "))
+}
+
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(ggplot2)
+  library(cluster)
+  library(factoextra)
+  library(FactoMineR)
+  library(fpc)
+  library(mclust)
+  library(readr)
+  library(tibble)
+})
+
+# -------------------------------- LOAD DATA -----------------------------------
+if (!file.exists(DATA_FILE)) {
+  stop("Cannot find DATA_FILE: ", DATA_FILE,
+       "\nChange DATA_FILE at the top of this script.")
+}
+raw_data <- readRDS(DATA_FILE)
+
+needed_columns <- unique(c(ID_VAR, TRIP_VAR, YEAR_VAR, ANALYSIS_VARS))
+missing_columns <- setdiff(needed_columns, names(raw_data))
+if (length(missing_columns)) {
+  stop("These required columns are missing from the RDS file: ",
+       paste(missing_columns, collapse = ", "))
+}
+
+pb <- raw_data %>%
+  dplyr::filter(.data[[TRIP_VAR]] == TRIP_VALUE) %>%
+  dplyr::mutate(.row_id = dplyr::row_number())
+
+if (nrow(pb) == 0) stop("No rows found for Trip == '", TRIP_VALUE, "'.")
+
+# Stable row identity: preserve the original individual ID and create a unique
+# row ID for analysis/output. Repeated individuals must be addressed explicitly.
+duplicate_ids <- pb %>%
+  dplyr::count(.data[[ID_VAR]], name = "n_rows") %>%
+  dplyr::filter(n_rows > 1)
+
+write_csv(duplicate_ids, file.path(OUTPUT_DIR, "repeated_IDs_check.csv"))
+
+if (nrow(duplicate_ids) > 0 && !ALLOW_REPEATED_ROWS) {
+  stop(
+    "Repeated TOPPID values were found in the Post-Breeding subset. ",
+    "See repeated_IDs_check.csv. Do not treat multiple trips from the same ",
+    "seal as independent without a justified approach. Resolve the sampling ",
+    "unit first, or set ALLOW_REPEATED_ROWS <- TRUE only after documenting ",
+    "why repeated rows are appropriate for this analysis."
+  )
+}
+
+# Convert candidate variables to numeric and remove rows with missing/nonfinite
+# values for any selected analysis variable. The excluded rows are recorded.
+for (v in ANALYSIS_VARS) {
+  if (!is.numeric(pb[[v]])) {
+    suppressWarnings(pb[[v]] <- as.numeric(as.character(pb[[v]])))
+  }
+}
+valid_rows <- complete.cases(pb[, ANALYSIS_VARS, drop = FALSE]) &
+  apply(pb[, ANALYSIS_VARS, drop = FALSE], 1, function(z) all(is.finite(z)))
+excluded <- pb[!valid_rows, c(ID_VAR, ".row_id"), drop = FALSE]
+write_csv(excluded, file.path(OUTPUT_DIR, "rows_excluded_missing_or_nonfinite.csv"))
+pb <- pb[valid_rows, , drop = FALSE]
+
+if (nrow(pb) < max(K_CANDIDATES) + 2) stop("Too few complete rows for clustering.")
+if (any(vapply(pb[, ANALYSIS_VARS, drop = FALSE], sd, numeric(1)) == 0)) {
+  zero_var <- names(pb[, ANALYSIS_VARS, drop = FALSE])[
+    vapply(pb[, ANALYSIS_VARS, drop = FALSE], sd, numeric(1)) == 0
+  ]
+  stop("Zero-variance variables must be removed: ", paste(zero_var, collapse = ", "))
+}
+
+write_csv(
+  data.frame(
+    n_rows_input = nrow(raw_data %>% dplyr::filter(.data[[TRIP_VAR]] == TRIP_VALUE)),
+    n_rows_analysed = nrow(pb),
+    n_unique_IDs = dplyr::n_distinct(pb[[ID_VAR]]),
+    n_rows_excluded = nrow(excluded),
+    variables = length(ANALYSIS_VARS)
+  ),
+  file.path(OUTPUT_DIR, "sample_size_summary.csv")
+)
+
+# Summarise year representation; temporal effects are not automatically
+# controlled by unsupervised clustering and should be examined downstream.
+if (YEAR_VAR %in% names(pb)) {
+  year_summary <- pb %>%
+    dplyr::count(.data[[YEAR_VAR]], name = "n_rows")
+  write_csv(year_summary, file.path(OUTPUT_DIR, "sample_size_by_year.csv"))
+}
+
+# ----------------------------- CORE FUNCTIONS --------------------------------
+run_pca <- function(dat, vars, n_pc) {
+  x <- scale(dat[, vars, drop = FALSE], center = TRUE, scale = TRUE)
+  pca <- prcomp(x, center = FALSE, scale. = FALSE)
+  n_pc <- min(n_pc, ncol(pca$x), nrow(pca$x) - 1)
+  scores <- as.data.frame(pca$x[, seq_len(n_pc), drop = FALSE])
+  names(scores) <- paste0("PC", seq_len(n_pc))
+  list(pca = pca, scores = scores, x = x, n_pc = n_pc)
+}
+
+cluster_once <- function(scores, k, method = HC_METHOD) {
+  d <- dist(scores)
+  hc <- hclust(d, method = method)
+  cl <- cutree(hc, k = k)
+  list(hc = hc, cluster = cl, silhouette = mean(cluster::silhouette(cl, d)[, "sil_width"]))
+}
+
+# Bootstrap stability via fpc::clusterboot. Average Jaccard values indicate
+# how reproducibly each cluster is recovered under resampling; these are not
+# evidence by themselves that groups are biologically discrete.
+cluster_stability <- function(scores, k, B = BOOTSTRAP_REPS) {
+  set.seed(20261027 + k + ncol(scores))
+  cb <- tryCatch(
+    fpc::clusterboot(
+      scores,
+      B = B,
+      bootmethod = "boot",
+      clustermethod = fpc::hclustCBI,
+      method = HC_METHOD,
+      k = k,
+      count = FALSE,
+      seed = 20261027 + k + ncol(scores)
+    ),
+    error = function(e) {
+      warning("clusterboot failed for k=", k, ": ", conditionMessage(e))
+      NULL
+    }
+  )
+  if (is.null(cb)) {
+    return(list(mean_jaccard = NA_real_, cluster_jaccard = NA_character_))
+  }
+  jac <- cb$bootmean
+  list(
+    mean_jaccard = mean(jac, na.rm = TRUE),
+    cluster_jaccard = paste(round(jac, 3), collapse = ";")
+  )
+}
+
+fit_partition <- function(dat, vars, n_pc, k, label) {
+  p <- run_pca(dat, vars, n_pc)
+  scores <- p$scores
+  fit <- cluster_once(scores, k)
+  cl <- factor(fit$cluster, levels = seq_len(k),
+               labels = paste0("Cluster ", seq_len(k)))
+  sizes <- as.data.frame(table(cl), stringsAsFactors = FALSE)
+  names(sizes) <- c("cluster", "n")
+  stab <- cluster_stability(scores, k)
+  list(
+    label = label, vars = vars, n_pc = p$n_pc, k = k,
+    pca = p$pca, scores = scores, hc = fit$hc,
+    cluster = cl, silhouette = fit$silhouette,
+    stability = stab, sizes = sizes
+  )
+}
+
+# ---------------------------- PRIMARY PCA ------------------------------------
+pca_full <- run_pca(pb, ANALYSIS_VARS, max(PC_CANDIDATES))
+pca_summary <- data.frame(
+  PC = seq_along(pca_full$pca$sdev),
+  eigenvalue = pca_full$pca$sdev^2,
+  variance_explained = (pca_full$pca$sdev^2) / sum(pca_full$pca$sdev^2),
+  cumulative_variance = cumsum((pca_full$pca$sdev^2) / sum(pca_full$pca$sdev^2))
+)
+write_csv(pca_summary, file.path(OUTPUT_DIR, "PCA_variance_full.csv"))
+write_csv(
+  data.frame(variable = rownames(pca_full$pca$rotation),
+             pca_full$pca$rotation, check.names = FALSE),
+  file.path(OUTPUT_DIR, "PCA_loadings_full.csv")
+)
+
+p_var <- ggplot(pca_summary, aes(x = PC, y = cumulative_variance)) +
+  geom_line() + geom_point() +
+  scale_x_continuous(breaks = pca_summary$PC) +
+  labs(x = "Principal component", y = "Cumulative variance explained",
+       title = "Post-Breeding PCA: cumulative variance") +
+  theme_minimal()
+ggsave(file.path(FIGURE_DIR, "PCA_cumulative_variance.pdf"), p_var,
+       width = 7, height = 5)
+
+# ------------------------- COMPARE k AND PC COUNTS ----------------------------
+diagnostic_rows <- list()
+fit_objects <- list()
+counter <- 1L
+
+for (npc in PC_CANDIDATES) {
+  if (npc >= ncol(pca_full$pca$x)) next
+  for (k in K_CANDIDATES) {
+    fit <- fit_partition(pb, ANALYSIS_VARS, npc, k,
+                         label = paste0("full_PC", npc, "_k", k))
+    fit_objects[[fit$label]] <- fit
+    diagnostic_rows[[counter]] <- data.frame(
+      analysis = "full", n_PC = npc, k = k,
+      cumulative_variance = pca_summary$cumulative_variance[npc],
+      mean_silhouette = fit$silhouette,
+      mean_bootstrap_jaccard = fit$stability$mean_jaccard,
+      cluster_jaccard = fit$stability$cluster_jaccard,
+      minimum_cluster_n = min(as.numeric(fit$sizes$n)),
+      cluster_sizes = paste(fit$sizes$n, collapse = ";")
+    )
+    counter <- counter + 1L
+  }
+}
+diagnostics <- dplyr::bind_rows(diagnostic_rows)
+write_csv(diagnostics, file.path(OUTPUT_DIR, "k_PC_sensitivity_diagnostics.csv"))
+
+# Plot diagnostics; do not select k using a single metric alone.
+p_sil <- ggplot(diagnostics, aes(x = factor(k), y = mean_silhouette,
+                                 group = factor(n_PC), colour = factor(n_PC))) +
+  geom_point() + geom_line() +
+  labs(x = "Number of clusters (k)", y = "Mean silhouette width",
+       colour = "Number of PCs", title = "Post-Breeding cluster diagnostics") +
+  theme_minimal()
+ggsave(file.path(FIGURE_DIR, "cluster_silhouette_by_k_PC.pdf"), p_sil,
+       width = 7, height = 5)
+
+# ----------------------- ISOTOPE-EXCLUSION SENSITIVITY ------------------------
+BEHAVIOURAL_VARS <- setdiff(ANALYSIS_VARS, ISOTOPE_VARS)
+if (length(BEHAVIOURAL_VARS) < 2) stop("Too few variables for isotope-exclusion analysis.")
+
+isotope_sensitivity <- list()
+counter <- 1L
+for (npc in PC_CANDIDATES) {
+  for (k in K_CANDIDATES) {
+    fit_full <- fit_partition(pb, ANALYSIS_VARS, npc, k,
+                              label = paste0("full_PC", npc, "_k", k))
+    fit_noiso <- fit_partition(pb, BEHAVIOURAL_VARS, npc, k,
+                               label = paste0("no_isotopes_PC", npc, "_k", k))
+    ari <- mclust::adjustedRandIndex(as.integer(fit_full$cluster),
+                                     as.integer(fit_noiso$cluster))
+    isotope_sensitivity[[counter]] <- data.frame(
+      n_PC = npc, k = k,
+      ARI_full_vs_no_isotopes = ari,
+      silhouette_full = fit_full$silhouette,
+      silhouette_no_isotopes = fit_noiso$silhouette,
+      stability_full = fit_full$stability$mean_jaccard,
+      stability_no_isotopes = fit_noiso$stability$mean_jaccard,
+      min_cluster_n_full = min(as.numeric(fit_full$sizes$n)),
+      min_cluster_n_no_isotopes = min(as.numeric(fit_noiso$sizes$n)),
+      sizes_full = paste(fit_full$sizes$n, collapse = ";"),
+      sizes_no_isotopes = paste(fit_noiso$sizes$n, collapse = ";")
+    )
+    counter <- counter + 1L
+  }
+}
+isotope_sensitivity <- dplyr::bind_rows(isotope_sensitivity)
+write_csv(isotope_sensitivity,
+          file.path(OUTPUT_DIR, "isotope_exclusion_sensitivity.csv"))
+
+# ------------------------- CHOOSE FINAL SOLUTION ------------------------------
+# Provisional default: 5 PCs and k=3, matching the original workflow, but this
+# is NOT automatically endorsed. Review diagnostics, minimum sizes, stability,
+# isotope sensitivity, year structure and ecological interpretability before
+# setting FINAL_N_PC and FINAL_K below.
+FINAL_N_PC <- 5
+FINAL_K <- 3
+
+if (!FINAL_N_PC %in% PC_CANDIDATES) {
+  stop("FINAL_N_PC must be one of PC_CANDIDATES.")
+}
+if (!FINAL_K %in% K_CANDIDATES) {
+  stop("FINAL_K must be one of K_CANDIDATES.")
+}
+
+final_fit <- fit_partition(pb, ANALYSIS_VARS, FINAL_N_PC, FINAL_K,
+                           label = "final_full")
+pb_final <- pb %>%
+  dplyr::mutate(cluster = final_fit$cluster)
+
+# Save cluster assignments joined to the original data. Row order is preserved.
+write_csv(pb_final, file.path(OUTPUT_DIR, "PB_Clusters_revised.csv"))
+saveRDS(final_fit$pca, file.path(OUTPUT_DIR, "PCA_final.rds"))
+saveRDS(final_fit$hc, file.path(OUTPUT_DIR, "HCPC_hclust_final.rds"))
+write_csv(
+  data.frame(
+    ID = pb_final[[ID_VAR]],
+    row_id = pb_final$.row_id,
+    cluster = as.character(final_fit$cluster),
+    final_n_PC = FINAL_N_PC,
+    final_k = FINAL_K
+  ),
+  file.path(OUTPUT_DIR, "final_cluster_assignments.csv")
+)
+
+# Dendrogram and PCA score plot (first two retained PCs).
+pdf(file.path(FIGURE_DIR, "final_dendrogram.pdf"), width = 9, height = 6)
+plot(final_fit$hc, labels = FALSE,
+     main = paste0("Post-Breeding hierarchical clustering (k = ", FINAL_K, ")"),
+     xlab = "", sub = "")
+rect.hclust(final_fit$hc, k = FINAL_K, border = seq_len(FINAL_K) + 1)
+dev.off()
+
+score_plot_data <- cbind(
+  pb_final[, c(ID_VAR, YEAR_VAR), drop = FALSE],
+  final_fit$scores,
+  cluster = final_fit$cluster
+)
+p_scores <- ggplot(score_plot_data,
+                   aes(x = PC1, y = PC2, colour = cluster)) +
+  geom_point(size = 2, alpha = 0.8) +
+  labs(title = "Post-Breeding PCA scores by selected cluster",
+       subtitle = paste0(FINAL_N_PC, " PCs used for clustering; plot shows first two"),
+       colour = "Cluster") +
+  theme_minimal()
+ggsave(file.path(FIGURE_DIR, "final_PCA_scores_by_cluster.pdf"), p_scores,
+       width = 7, height = 5)
+
+# --------------------------- CLUSTER PROFILES --------------------------------
+# Descriptive summaries are used to interpret cluster profiles, not to claim
+# independent validation. Report n and uncertainty, not only p-values.
+profile_long <- pb_final %>%
+  dplyr::select(cluster, dplyr::all_of(ANALYSIS_VARS)) %>%
+  tidyr::pivot_longer(cols = dplyr::all_of(ANALYSIS_VARS),
+                      names_to = "variable", values_to = "value") %>%
+  dplyr::group_by(cluster, variable) %>%
+  dplyr::summarise(
+    n = sum(is.finite(value)),
+    mean = mean(value, na.rm = TRUE),
+    sd = sd(value, na.rm = TRUE),
+    median = median(value, na.rm = TRUE),
+    q25 = quantile(value, 0.25, na.rm = TRUE),
+    q75 = quantile(value, 0.75, na.rm = TRUE),
+    .groups = "drop"
+  )
+write_csv(profile_long, file.path(OUTPUT_DIR, "cluster_profiles_long.csv"))
+
+cluster_sizes <- pb_final %>%
+  dplyr::count(cluster, name = "n") %>%
+  dplyr::mutate(proportion = n / sum(n),
+                below_minimum = n < MIN_CLUSTER_N)
+write_csv(cluster_sizes, file.path(OUTPUT_DIR, "final_cluster_sizes.csv"))
+
+# Exploratory Kruskal-Wallis tests per variable with Benjamini-Hochberg
+# correction. These describe association with the clusters defined using these
+# same variables; they are NOT independent validation tests.
+exploratory_tests <- lapply(ANALYSIS_VARS, function(v) {
+  dd <- pb_final[, c("cluster", v), drop = FALSE]
+  names(dd) <- c("cluster", "value")
+  dd <- dd[is.finite(dd$value) & !is.na(dd$cluster), , drop = FALSE]
+  if (length(unique(dd$cluster)) < 2) {
+    return(data.frame(variable = v, statistic = NA_real_, p = NA_real_))
+  }
+  test <- tryCatch(stats::kruskal.test(value ~ cluster, data = dd),
+                   error = function(e) NULL)
+  if (is.null(test)) {
+    data.frame(variable = v, statistic = NA_real_, p = NA_real_)
+  } else {
+    data.frame(variable = v, statistic = unname(test$statistic),
+               p = test$p.value)
+  }
+})
+exploratory_tests <- dplyr::bind_rows(exploratory_tests) %>%
+  dplyr::mutate(p_BH = p.adjust(p, method = "BH"))
+write_csv(exploratory_tests,
+          file.path(OUTPUT_DIR, "exploratory_cluster_profile_tests.csv"))
+
+# Faceted descriptive distributions, with individual observations shown.
+plot_data <- pb_final %>%
+  dplyr::select(cluster, dplyr::all_of(ANALYSIS_VARS)) %>%
+  tidyr::pivot_longer(cols = dplyr::all_of(ANALYSIS_VARS),
+                      names_to = "variable", values_to = "value")
+p_profiles <- ggplot(plot_data, aes(x = cluster, y = value, colour = cluster)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.25) +
+  geom_jitter(width = 0.12, alpha = 0.45, size = 0.8) +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(title = "Post-Breeding cluster profiles",
+       subtitle = "Descriptive plots; clusters were constructed using these variables",
+       x = "Cluster", y = "Observed value") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1))
+ggsave(file.path(FIGURE_DIR, "cluster_profiles_all_variables.pdf"),
+       p_profiles, width = 13, height = 10)
+
+# ----------------------------- YEAR STRUCTURE --------------------------------
+# Cluster-year association is a diagnostic, not a causal test. If trips span
+# years unevenly, report this and consider year effects in subsequent models.
+if (YEAR_VAR %in% names(pb_final)) {
+  year_tab <- table(pb_final$cluster, pb_final[[YEAR_VAR]], useNA = "ifany")
+  write.csv(as.data.frame.matrix(year_tab),
+            file.path(OUTPUT_DIR, "cluster_by_year_counts.csv"))
+  if (all(rowSums(year_tab) > 0) && all(colSums(year_tab) > 0)) {
+    year_test <- tryCatch(chisq.test(year_tab), error = function(e) NULL)
+    if (!is.null(year_test)) {
+      capture.output(year_test,
+                     file = file.path(OUTPUT_DIR, "cluster_by_year_chisq.txt"))
+    }
+  }
+}
+
+# ------------------------------- AUDIT REPORT ---------------------------------
+capture.output(sessionInfo(),
+               file = file.path(OUTPUT_DIR, "sessionInfo.txt"))
+writeLines(
+  c(
+    "Post-Breeding revised clustering analysis",
+    paste("Input:", normalizePath(DATA_FILE, mustWork = FALSE)),
+    paste("Trip subset:", TRIP_VALUE),
+    paste("Rows analysed:", nrow(pb_final)),
+    paste("Unique IDs:", dplyr::n_distinct(pb_final[[ID_VAR]])),
+    paste("Variables:", paste(ANALYSIS_VARS, collapse = ", ")),
+    paste("Final PCs:", FINAL_N_PC),
+    paste("Final k:", FINAL_K),
+    paste("Clustering method:", HC_METHOD),
+    paste("Random seed:", 20261027),
+    paste("Minimum cluster size threshold for review:", MIN_CLUSTER_N),
+    "",
+    "Interpretation cautions:",
+    "- The final k is provisional and must be selected after inspecting diagnostics.",
+    "- Silhouette and bootstrap stability do not establish biological discreteness.",
+    "- Isotope-exclusion sensitivity assesses dependence on isotope variables; it does not prove diet or prey partitioning.",
+    "- Cluster profile tests use variables involved in cluster construction and are descriptive/exploratory, not independent validation.",
+    "- NicheROVER is deliberately not run automatically; assess sample size, dimension, distributional assumptions and prior sensitivity first.",
+    "- Contemporary observations from 2008-2017 cannot by themselves demonstrate diversification during historical recovery or density-dependent causation."
+  ),
+  con = file.path(OUTPUT_DIR, "analysis_readme.txt")
+)
+
+message("Analysis complete. Review outputs in: ", normalizePath(OUTPUT_DIR))
+message("Figures saved in: ", normalizePath(FIGURE_DIR))
+message("Before reporting results, inspect k_PC_sensitivity_diagnostics.csv, ",
+        "isotope_exclusion_sensitivity.csv, final_cluster_sizes.csv, and repeated_IDs_check.csv.")
