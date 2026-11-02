@@ -57,10 +57,10 @@ library(sf)
 SEED         <- 20261102
 K            <- 3        # number of strategies (see robustness Rmd)
 N_DIM        <- 4        # MFA dimensions used for clustering (parallel analysis / broken stick)
-N_BOOT       <- 500      # bootstrap replicates for cluster stability
-N_PERM       <- 4999     # permutations for Freedman-Lane tests
-N_POST       <- 1e4      # nicheROVER posterior draws
-N_SIM        <- 200      # simulations for the overlap null model
+N_BOOT       <- 50#500      # bootstrap replicates for cluster stability
+N_PERM       <- 499#4999     # permutations for Freedman-Lane tests
+N_POST       <- 2000#1e4      # nicheROVER posterior draws
+N_SIM        <- 20#200      # simulations for the overlap null model
 UNCERTAIN_Z  <- 0.80     # seals with max membership probability below this are "uncertain"
 
 # Equivalence margins (permil) for "the two offshore strategies feed at the same
