@@ -52,8 +52,10 @@ ANALYSIS_VARS <- c(
 )
 ISOTOPE_VARS <- c("d13C", "d15N")
 
-# Main candidate range. Given the earlier diagnostics, inspect k = 2, 3, 4.
-K_CANDIDATES <- 2:4
+# Explore a broad range of cluster numbers without privileging previous results.
+# Inspect k = 2 through 10; choose the final solution only after reviewing all
+# diagnostics, cluster sizes, sensitivity analyses and ecological interpretability.
+K_CANDIDATES <- 2:10
 PC_CANDIDATES <- c(4, 5, 6)
 BOOTSTRAP_REPS <- 500
 MIN_CLUSTER_N <- 10
