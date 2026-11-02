@@ -67,6 +67,7 @@ N_PA            <- 1000   # parallel-analysis permutations
 N_GAP           <- 200    # gap-statistic reference data sets
 N_BOOT          <- 500    # bootstrap replicates for stability
 SKEW_THRESHOLD  <- 1      # |skewness| above which variables are log-transformed in the sensitivity run
+N_NULL          <- 500    # simulations for the "is there cluster structure?" test
 
 # Part B
 N_PERM          <- 4999   # permutations for Freedman-Lane tests
@@ -332,6 +333,32 @@ g <- ggplot(kp, aes(k, value)) + geom_line() + geom_point() +
   scale_x_continuous(breaks = K_RANGE) + theme_bw() + labs(x = "Number of strategies", y = NULL)
 g
 ggsave(file.path(FIG, "A_number_of_strategies.pdf"), g, width = 6, height = 7)
+```
+
+## Is there cluster structure at all?
+
+Clustering always returns groups, even from a continuum. Here the observed
+silhouette is compared with that obtained by applying the same clustering to
+`r N_NULL` data sets simulated from a single multivariate normal distribution
+with the observed variance on each retained dimension (no groups). A p-value
+near or above 0.05 means the strategies are weakly separated and should be
+described as modes of a continuum rather than discrete groups.
+
+```{r null-structure}
+sds <- apply(S, 2, sd)
+set.seed(SEED)
+null_struct <- do.call(rbind, lapply(intersect(2:4, K_RANGE), function(k) {
+  obs <- mean(silhouette(hcpc_lite(S, k), dist(S))[, 3])
+  sim <- replicate(N_NULL, {
+    Y <- sapply(sds, function(s) rnorm(nrow(S), 0, s))
+    mean(silhouette(hcpc_lite(Y, k), dist(Y))[, 3])
+  })
+  data.frame(k = k, silhouette = obs, null_median = median(sim),
+             null_95 = quantile(sim, 0.95), p = (1 + sum(sim >= obs)) / (N_NULL + 1))
+}))
+rownames(null_struct) <- NULL
+null_struct %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(null_struct, file.path(OUT, "A_null_structure_test.csv"), row.names = FALSE)
 ```
 
 ## Choosing between k = 2 and k = 3
@@ -896,7 +923,8 @@ list(
   niche_size = size_tab %>% dplyr::select(strategy, n, SEAc, SEAb_median),
   overlap_95 = round(ov_mean[, , 1], 1),
   SIBER_size = if (exists("siber_size")) siber_size else "SIBER not run",
-  SIBER_overlap = if (exists("siber_ov")) siber_ov else "SIBER not run")
+  SIBER_overlap = if (exists("siber_ov")) siber_ov else "SIBER not run",
+  null_structure = null_struct)
 saveRDS(dat, file.path(OUT, "PB_strategies.rds"))
 sessionInfo()
 ```
@@ -912,7 +940,9 @@ hierarchical clustering followed by k-means consolidation (HCPC; FactoMineR).
 Candidate solutions (k = 2–8) were evaluated with the gap statistic
 (Tibshirani et al. 2001), mean silhouette width, minimum cluster size and
 stability under a whole-pipeline bootstrap (500 resamples; mean Jaccard,
-Hennig 2007). Solutions with k ≥ 4 only isolated single individuals and were
+Hennig 2007), and the strength of cluster structure was tested against data
+simulated from a single multivariate normal distribution (silhouette width,
+500 simulations). Solutions with k ≥ 4 only isolated single individuals and were
 unstable. The gap statistic increased from k = 2 to k = 3 but by less than one
 standard error, so it did not discriminate between them (the conservative 1-SE
 rule returns k = 2). We retained k = 3 because it was a nested refinement of

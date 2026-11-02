@@ -598,19 +598,39 @@ compared here need not be from the same year.
 
 ```{r pb-pm}
 if (file.exists(PB_ASSIGNMENTS)) {
+  yr <- function(x) as.integer(as.character(x))
   pb <- read.csv(PB_ASSIGNMENTS) %>%
-    mutate(MainID = as.character(MainID)) %>% filter(!is.na(MainID)) %>%
-    arrange(ProcedureYear) %>% distinct(MainID, .keep_all = TRUE) %>%
-    dplyr::select(MainID, PB_year = ProcedureYear, PB_strategy = strategy)
-  both <- dat %>% filter(!is.na(MainID)) %>%
-    dplyr::select(MainID, PM_year = ProcedureYear, PM_strategy = strategy) %>%
-    inner_join(pb, by = "MainID")
-  cat(n_distinct(both$MainID), "seals with both a PB and a PM trip\n")
-  print(both)
+    mutate(MainID = as.character(MainID), PB_year = yr(ProcedureYear),
+           PB_strategy = as.character(strategy)) %>%
+    filter(!is.na(MainID)) %>% arrange(PB_year) %>%
+    dplyr::select(MainID, TOPPID_PB = TOPPID, PB_year, PB_strategy)
+  pm <- dat %>% filter(!is.na(MainID)) %>%
+    transmute(MainID, TOPPID_PM = TOPPID, PM_year = yr(ProcedureYear),
+              PM_strategy = as.character(strategy)) %>%
+    arrange(PM_year)
+
+  # All PB-PM trip pairs, for reference (seals with repeated trips appear more than once)
+  print(inner_join(pm, pb, by = "MainID"))
+
+  # Analysis unit = seal: earliest PM trip paired with earliest PB trip
+  both <- inner_join(distinct(pm, MainID, .keep_all = TRUE),
+                     distinct(pb, MainID, .keep_all = TRUE), by = "MainID")
+  cat(nrow(both), "seals with both a PB and a PM trip (one pair per seal)\n")
   tab <- table(PB = both$PB_strategy, PM = both$PM_strategy)
   print(tab)
   if (nrow(both) >= 5 && all(dim(tab) > 1))
     print(fisher.test(tab, simulate.p.value = TRUE, B = 1e4))
+
+  # Same offshore region on both trips? (seals whose PB strategy also exists after the moult)
+  sh <- both %>% filter(PB_strategy %in% levels(dat$strategy))
+  if (nrow(sh) >= 3) {
+    obs <- sum(sh$PB_strategy == sh$PM_strategy)
+    set.seed(SEED)
+    null <- replicate(N_PERM, sum(sh$PB_strategy == sample(sh$PM_strategy)))
+    cat(obs, "of", nrow(sh), "seals used the same region on both trips; expected by chance",
+        round(mean(null), 1), "; P =", signif((1 + sum(null >= obs)) / (N_PERM + 1), 3), "\n")
+  }
+  write.csv(both, file.path(OUT, "A_PB_PM_per_seal.csv"), row.names = FALSE)
 } else {
   message("PB assignments not found at ", PB_ASSIGNMENTS, ": run the PB script first.")
 }
@@ -953,6 +973,123 @@ sens_iso <- lapply(subsets, summ_subset)
 sens_iso
 ```
 
+# Part C — Post-Moult behaviour as a continuum
+
+Post-moult groups are only weakly separated (Section "Is there cluster
+structure at all?"), so the more natural analysis is to relate isotopes to each
+seal's **position along the behavioural gradient** (its scores on the retained
+PCA axes) rather than to group labels. If the gradient explains isotopes better
+than the two modes do, post-moult foraging is best described as a continuum.
+
+## The behavioural gradient
+
+```{r gradient-axes}
+G <- as.data.frame(res.pca$ind$coord[, 1:N_DIM]); names(G) <- paste0("Dim", 1:N_DIM)
+DIMS <- names(G)
+gd <- cbind(dat[, c("TOPPID", "MainID", "ProcedureYear", "strategy", ISO, "MesoEcoProportionCAC")], G)
+cac_min <- min(gd$MesoEcoProportionCAC[gd$MesoEcoProportionCAC > 0])
+gd$logCAC <- log(gd$MesoEcoProportionCAC + cac_min / 2)
+
+# What each axis represents (variable-axis correlations, |r| >= 0.5)
+cor_tab <- res.pca$var$cor[, 1:N_DIM]; colnames(cor_tab) <- DIMS
+lapply(setNames(DIMS, DIMS), function(d) { r <- cor_tab[, d]; round(sort(r[abs(r) >= 0.5]), 2) })
+```
+
+```{r gradient-distribution, fig.height = 4}
+g <- ggplot(gd, aes(Dim1, fill = strategy)) + geom_histogram(bins = 25, colour = "white") +
+  scale_fill_manual(values = COLS) + theme_bw() +
+  labs(x = sprintf("Dim 1 score (%.1f%% of variance)", pc_tab$pct_var[1]),
+       y = "Number of trips", fill = "Mode")
+g
+ggsave(file.path(FIG, "C_gradient_distribution.pdf"), g, width = 7, height = 4)
+
+# Hartigan's dip test of unimodality along the main axis (needs the 'diptest' package)
+if (requireNamespace("diptest", quietly = TRUE)) diptest::dip.test(gd$Dim1) else
+  message("Install the 'diptest' package for a formal test of unimodality.")
+```
+
+## Do isotopes vary along the gradient?
+
+Each axis is tested while adjusting for the other axes and for year
+(Freedman–Lane permutation tests), so each test asks whether that dimension of
+behaviour explains isotopic variation on its own.
+
+```{r gradient-isotopes}
+set.seed(SEED)
+grad_tests <- bind_rows(lapply(ISO, function(v) bind_rows(lapply(DIMS, function(d)
+  fl_test(gd, v, term = d, covars = c(setdiff(DIMS, d), "ProcedureYear")) %>% mutate(term = d)))))
+grad_tests$p_BH <- p.adjust(grad_tests$p_perm, "BH")
+grad_tests %>% dplyr::select(response, term, n, F, p_perm, p_BH) %>%
+  mutate(across(c(F, p_perm, p_BH), ~ signif(.x, 3)))
+
+# Slopes (permil per unit of axis score) with 95% CIs
+grad_fits <- lapply(setNames(ISO, ISO), function(v)
+  lm(reformulate(c(DIMS, "ProcedureYear"), v), data = gd))
+grad_slopes <- bind_rows(lapply(names(grad_fits), function(v) {
+  f <- grad_fits[[v]]; ci <- confint(f)[DIMS, , drop = FALSE]
+  data.frame(isotope = v, axis = DIMS, slope = unname(coef(f)[DIMS]),
+             lwr = unname(ci[, 1]), upr = unname(ci[, 2]))
+}))
+grad_slopes %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(grad_tests, file.path(OUT, "C_isotopes_vs_gradient_tests.csv"), row.names = FALSE)
+write.csv(grad_slopes, file.path(OUT, "C_isotopes_vs_gradient_slopes.csv"), row.names = FALSE)
+```
+
+California Current use is the clearest single behavioural correlate of
+isotopic enrichment in both trips, so it is also tested directly (log scale,
+adjusting for year).
+
+```{r gradient-cac}
+set.seed(SEED)
+cac_tests <- bind_rows(lapply(ISO, function(v) fl_test(gd, v, term = "logCAC", covars = "ProcedureYear")))
+cac_tests %>% mutate(across(c(F, p_perm), ~ signif(.x, 3)))
+sapply(setNames(ISO, ISO), function(v)
+  round(cor(gd[[v]], gd$MesoEcoProportionCAC, method = "spearman"), 3))
+```
+
+## Groups or gradient? Model comparison
+
+Lower AICc = better support (ΔAICc > 2 is a meaningful difference).
+
+```{r gradient-vs-groups}
+aicc <- function(f) { k <- attr(logLik(f), "df"); m <- nobs(f); AIC(f) + 2 * k * (k + 1) / (m - k - 1) }
+forms <- list(`Year only`              = "ProcedureYear",
+              `Two modes (groups)`     = c("strategy", "ProcedureYear"),
+              `Main axis (Dim 1)`      = c("Dim1", "ProcedureYear"),
+              `All retained axes`      = c(DIMS, "ProcedureYear"),
+              `California Current use` = c("logCAC", "ProcedureYear"))
+cmp <- bind_rows(lapply(ISO, function(v) bind_rows(lapply(names(forms), function(nm) {
+  f <- lm(reformulate(forms[[nm]], v), data = gd)
+  data.frame(isotope = v, model = nm, n_par = attr(logLik(f), "df"), AICc = aicc(f),
+             adj_R2 = summary(f)$adj.r.squared)
+})) %>% mutate(delta_AICc = AICc - min(AICc)) %>% arrange(delta_AICc)))
+cmp %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(cmp, file.path(OUT, "C_groups_vs_gradient_AICc.csv"), row.names = FALSE)
+```
+
+```{r gradient-plot, fig.height = 6}
+gp <- gd %>% dplyr::select(strategy, all_of(ISO), Dim1, logCAC) %>%
+  pivot_longer(all_of(ISO), names_to = "isotope", values_to = "value") %>%
+  pivot_longer(c(Dim1, logCAC), names_to = "gradient", values_to = "x")
+g <- ggplot(gp, aes(x, value)) +
+  geom_point(aes(colour = strategy), alpha = 0.8) +
+  geom_smooth(method = "lm", formula = y ~ x, colour = "black") +
+  facet_grid(isotope ~ gradient, scales = "free",
+             labeller = labeller(gradient = c(Dim1 = "Dim 1 score",
+                                              logCAC = "log(California Current proportion)"))) +
+  scale_colour_manual(values = COLS) + theme_bw() +
+  labs(x = NULL, y = "‰", colour = "Mode")
+g
+ggsave(file.path(FIG, "C_isotopes_vs_gradient.pdf"), g, width = 8, height = 6, device = cairo_pdf)
+```
+
+**Interpretation.** Evidence for a continuum: (i) weak cluster structure
+(null-model p close to 0.05), (ii) a unimodal or only weakly bimodal main axis,
+and (iii) isotopes explained by position along the gradient (or by California
+Current use) at least as well as by group membership. If so, describe
+post-moult foraging as continuous variation along the offshore–latitudinal
+gradient, with the two modes as convenient summaries rather than strategies.
+
 # Summary
 
 ```{r summary}
@@ -966,7 +1103,10 @@ list(
   niche_size = size_tab %>% dplyr::select(strategy, n, SEAc, SEAb_median),
   overlap_95 = round(ov_mean[, , 1], 1),
   SIBER_size = if (exists("siber_size")) siber_size else "SIBER not run",
-  SIBER_overlap = if (exists("siber_ov")) siber_ov else "SIBER not run")
+  SIBER_overlap = if (exists("siber_ov")) siber_ov else "SIBER not run",
+  null_structure = null_struct,
+  isotopes_vs_gradient = grad_tests %>% dplyr::select(response, term, p_perm, p_BH),
+  groups_vs_gradient = cmp %>% dplyr::select(isotope, model, delta_AICc, adj_R2))
 saveRDS(dat, file.path(OUT, "PM_strategies.rds"))
 sessionInfo()
 ```
@@ -986,7 +1126,12 @@ solutions (k = 2–8) were evaluated with the gap statistic (Tibshirani et al.
 stability under a whole-pipeline bootstrap (500 resamples; mean Jaccard ≥ 0.75,
 Hennig 2007), and the strength of cluster structure was tested against data
 simulated from a single multivariate normal distribution. [Report K, the
-silhouette null-model p-value, and why K + 1 was rejected.] Robustness was assessed by
+silhouette null-model p-value, and why K + 1 was rejected.] Because cluster
+structure was weak, isotope values were also related to each individual's
+position along the behavioural gradient (scores on the retained components),
+using Freedman–Lane permutation tests adjusting for the other components and
+year, and models based on groups and on the continuous gradient were compared
+with AICc. Robustness was assessed by
 comparing partitions (adjusted Rand index) obtained with ±1 component,
 multiple factor analysis weighting spatial and diving variables equally,
 log-transformation of skewed variables, removal of redundant variables and of
