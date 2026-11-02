@@ -8,9 +8,6 @@ output:
     toc_depth: 3
     number_sections: true
     code_folding: show
-editor_options: 
-  markdown: 
-    wrap: 72
 ---
 
 ```{r setup, include=FALSE}
@@ -20,14 +17,13 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
 
 # Overview
 
-This workflow redesigns the Post-Breeding analysis so that the variables
-that **define** the foraging strategies are kept separate from the
-variables used to **test** and **characterise** them. (Robustness of the
-number of dimensions and clusters is in
-`NESE_HCPC_PostBreeding_Robustness.Rmd`.)
+This workflow redesigns the Post-Breeding analysis so that the variables that
+**define** the foraging strategies are kept separate from the variables used to
+**test** and **characterise** them. (Robustness of the number of dimensions and
+clusters is in `NESE_HCPC_PostBreeding_Robustness.Rmd`.)
 
 | Step | What | Role |
-|------------------------|------------------------|------------------------|
+|---|---|---|
 | 2 | MFA (space + diving blocks, equal weight) + HCPC | defines strategies |
 | 3 | Gaussian mixture on the MFA space | membership probabilities |
 | 4 | Isotopes, mass gain, trip duration, morphology, year | **independent** validation |
@@ -37,11 +33,11 @@ number of dimensions and clusters is in
 | 6.3 | Diving niche | descriptive |
 | 6.4 | Null model for niche overlap | quantifies circularity |
 
-Stable isotopes, mass gain and trip duration are **not** used to build
-the clusters, so differences in them are genuine tests. Spatial and
-diving niches are partly determined by the clustering itself and are
-reported as descriptions, with a null model (6.4) showing how much
-overlap would be expected from clustering alone.
+Stable isotopes, mass gain and trip duration are **not** used to build the
+clusters, so differences in them are genuine tests. Spatial and diving niches
+are partly determined by the clustering itself and are reported as
+descriptions, with a null model (6.4) showing how much overlap would be
+expected from clustering alone.
 
 ```{r libraries}
 library(dplyr)
@@ -180,7 +176,7 @@ hcpc_ratio <- function(S, kmin = 2, kmax = 8) {
 
 # Relabel a partition so its labels match a reference partition as closely as possible
 perms <- function(v) if (length(v) <= 1) list(v) else
-  do.call(c, lapply(seq_along(v), function(i) lapply(perms(v[-i]), function(p) c(v[i], p))))
+  do.call(base::c, lapply(seq_along(v), function(i) lapply(perms(v[-i]), function(p) c(v[i], p))))
 align_map <- function(new, ref) {        # returns map: map[new_label] = ref_label
   k <- max(new, ref)
   tab <- table(factor(new, 1:k), factor(ref, 1:k))
@@ -241,10 +237,10 @@ offdiag_mean <- function(O) mean(O[row(O) != col(O)])
 # Defining the strategies: MFA on space + diving
 
 Multiple Factor Analysis weights each block by the inverse of its first
-eigenvalue, so the spatial (8 variables) and diving (11 variables)
-blocks contribute equally, however many variables were measured in each.
-Isotopes are projected as a **supplementary** group: they are shown on
-the factor map but do not influence the solution.
+eigenvalue, so the spatial (8 variables) and diving (11 variables) blocks
+contribute equally, however many variables were measured in each. Isotopes are
+projected as a **supplementary** group: they are shown on the factor map but do
+not influence the solution.
 
 ```{r mfa}
 res.mfa <- mfa_fit(dat, ncp = N_DIM)
@@ -289,9 +285,8 @@ dat %>% group_by(strategy) %>%
 
 ## Cluster stability (whole-pipeline bootstrap)
 
-Each replicate resamples seals and re-runs MFA + clustering. Mean
-Jaccard \> 0.75 = stable, \> 0.85 = highly stable, \< 0.5 = dissolved
-(Hennig 2007).
+Each replicate resamples seals and re-runs MFA + clustering. Mean Jaccard
+> 0.75 = stable, > 0.85 = highly stable, < 0.5 = dissolved (Hennig 2007).
 
 ```{r jaccard}
 ref <- as.integer(dat$strategy)
@@ -299,9 +294,9 @@ J <- matrix(NA, N_BOOT, K)
 for (b in 1:N_BOOT) {
   ix <- unique(sample(n, replace = TRUE))
   cb <- hcpc_lite(mfa_coords(dat[ix, ]), K)
-  for (c in 1:K) {
-    A <- ix[ref[ix] == c]
-    if (length(A)) J[b, c] <- max(sapply(unique(cb), function(j) {
+  for (cc in 1:K) {
+    A <- ix[ref[ix] == cc]
+    if (length(A)) J[b, cc] <- max(sapply(unique(cb), function(j) {
       Bj <- ix[cb == j]; length(intersect(A, Bj)) / length(union(A, Bj)) }))
   }
 }
@@ -314,9 +309,9 @@ write.csv(jac, file.path(OUT, "jaccard_MFA.csv"), row.names = FALSE)
 
 ## Sensitivity: reduced variable set
 
-Drop the most redundant spatial variables (SD of distance to shelf, ρ =
-0.95 with the median; the North Central Pacific proportion, implied by
-the other three mesoecoregion proportions).
+Drop the most redundant spatial variables (SD of distance to shelf, ρ = 0.95
+with the median; the North Central Pacific proportion, implied by the other
+three mesoecoregion proportions).
 
 ```{r reduced}
 SPACE_FULL <- SPACE
@@ -347,10 +342,10 @@ ggsave(file.path(FIG, "strategy_profiles.pdf"), g, width = 11, height = 4.5)
 
 # Membership probabilities (Gaussian mixture)
 
-Hard clusters hide how confidently each seal is assigned. A Gaussian
-mixture fitted to the same MFA space gives each seal a probability of
-belonging to each strategy. BIC over G = 1–6 is shown for information;
-the K-component model is used for membership.
+Hard clusters hide how confidently each seal is assigned. A Gaussian mixture
+fitted to the same MFA space gives each seal a probability of belonging to each
+strategy. BIC over G = 1–6 is shown for information; the K-component model is
+used for membership.
 
 ```{r mclust}
 summary(mclustBIC(S, G = 1:6))
@@ -373,10 +368,10 @@ write.csv(data.frame(TOPPID = dat$TOPPID, strategy = dat$strategy, round(z, 3)),
 # Independent validation
 
 None of these variables were used to define the strategies. Tests are
-Freedman–Lane permutation F tests (robust to non-normality and to the
-small coastal group), with Benjamini–Hochberg correction across the
-family. Year is a covariate for isotopes (baseline variation) and mass
-gain; trip duration is a covariate for mass gain rate.
+Freedman–Lane permutation F tests (robust to non-normality and to the small
+coastal group), with Benjamini–Hochberg correction across the family. Year is
+a covariate for isotopes (baseline variation) and mass gain; trip duration is a
+covariate for mass gain rate.
 
 ```{r validation}
 val_specs <- list(
@@ -421,8 +416,8 @@ write.csv(contr, file.path(OUT, "validation_contrasts.csv"), row.names = FALSE)
 
 ## Do the two offshore strategies share the same isotopic position? (equivalence)
 
-Two one-sided tests (TOST): equivalence is supported if the 90 % CI of
-the difference lies entirely within ±margin.
+Two one-sided tests (TOST): equivalence is supported if the 90 % CI of the
+difference lies entirely within ±margin.
 
 ```{r equivalence}
 tost <- do.call(rbind, lapply(ISO, function(v) {
@@ -458,8 +453,8 @@ if (requireNamespace("lme4", quietly = TRUE)) {
 
 ## Year
 
-Three of the coastal seals are from 2014 (marine heatwave onset). Is
-coastal foraging a strategy or a response to that year's conditions?
+Three of the coastal seals are from 2014 (marine heatwave onset). Is coastal
+foraging a strategy or a response to that year's conditions?
 
 ```{r year}
 table(dat$strategy, dat$ProcedureYear)
@@ -489,11 +484,10 @@ cat(n_same, "of", n_rep, "repeat seals kept their strategy; expected by chance",
 
 ## Post-Breeding → Post-Molt (exploratory)
 
-Post-Molt trips of the same seals are projected into the Post-Breeding
-MFA space as supplementary individuals and assigned with the mixture
-model. Post- Molt trips are longer and in a different season, so a
-change of strategy is not necessarily inconsistency; treat as
-exploratory.
+Post-Molt trips of the same seals are projected into the Post-Breeding MFA
+space as supplementary individuals and assigned with the mixture model. Post-
+Molt trips are longer and in a different season, so a change of strategy is
+not necessarily inconsistency; treat as exploratory.
 
 ```{r consistency-pm}
 pm <- all_trips %>% filter(Trip == "PostMolt", !is.na(MainID), MainID %in% dat$MainID) %>%
@@ -522,9 +516,9 @@ if (nrow(pm) > 0) {
 ## Isotopic niche (independent of the clustering)
 
 nicheROVER with its default (non-informative) prior, in δ¹³C–δ¹⁵N space.
-Bayesian standard ellipse area (SEA_B) is computed from the same
-posterior (area of the 40 % ellipse, π√\|Σ\|), and SEAc
-(small-sample-corrected) from the data, so SIBER/JAGS are not required.
+Bayesian standard ellipse area (SEA_B) is computed from the same posterior
+(area of the 40 % ellipse, π√|Σ|), and SEAc (small-sample-corrected) from the
+data, so SIBER/JAGS are not required.
 
 ```{r iso-niche}
 set.seed(SEED)
@@ -568,12 +562,11 @@ overlap.plot(iso.over[, , , 1], col = clrs, mean.cred.col = "turquoise", equal.a
              xlab = "Overlap probability (%) - 95% isotopic niche region")
 ```
 
-**Caveats.** Isotope baselines vary among years; if the year effect in
-Section 4 is large, repeat with year-centred isotopes (below),
-remembering that centring also removes any real strategy difference
-confounded with year (e.g. coastal seals in 2014). Also state which
-tissue was sampled and the time window it integrates relative to the
-tracked trip.
+**Caveats.** Isotope baselines vary among years; if the year effect in Section 4
+is large, repeat with year-centred isotopes (below), remembering that centring
+also removes any real strategy difference confounded with year (e.g. coastal
+seals in 2014). Also state which tissue was sampled and the time window it
+integrates relative to the tracked trip.
 
 ```{r iso-yearcentred}
 iso_c <- dat %>% group_by(ProcedureYear) %>%
@@ -587,15 +580,14 @@ round(apply(overlap(iso.par.c, nreps = 5000, nprob = 5000, alpha = c(0.95, 0.99)
 
 ## Spatial niche (descriptive)
 
-One kernel utilisation distribution (UD) per seal on a common equal-area
-grid and a common bandwidth; the strategy UD is the mean of its seals'
-UDs, so each seal has equal weight regardless of track length. Overlap
-is measured with Bhattacharyya's affinity (BA; 0 = none, 1 = identical)
-and UDOI on the 95 % isopleths (Fieberg & Kochanny 2005). Because
-spatial variables helped define the strategies, low between-strategy
-overlap is expected and is a description, not a test. The
-individual-level BA (within vs between strategies) shows how tightly
-seals within a strategy share space.
+One kernel utilisation distribution (UD) per seal on a common equal-area grid
+and a common bandwidth; the strategy UD is the mean of its seals' UDs, so each
+seal has equal weight regardless of track length. Overlap is measured with
+Bhattacharyya's affinity (BA; 0 = none, 1 = identical) and UDOI on the 95 %
+isopleths (Fieberg & Kochanny 2005). Because spatial variables helped define
+the strategies, low between-strategy overlap is expected and is a description,
+not a test. The individual-level BA (within vs between strategies) shows how
+tightly seals within a strategy share space.
 
 ```{r tracks}
 tracks <- read.csv("../data/NESETracks6h.csv") %>%
@@ -606,9 +598,9 @@ tracks <- read.csv("../data/NESETracks6h.csv") %>%
 
 xy  <- st_coordinates(st_transform(st_as_sf(tracks, coords = c("longitude", "latitude"),
                                             crs = 4326), LAEA))
-col <- st_coordinates(st_transform(st_sfc(st_point(COLONY_LONLAT), crs = 4326), LAEA))
+colony_xy <- st_coordinates(st_transform(st_sfc(st_point(COLONY_LONLAT), crs = 4326), LAEA))
 tracks <- tracks %>% mutate(x = xy[, 1], y = xy[, 2],
-                            d_col = sqrt((x - col[1])^2 + (y - col[2])^2)) %>%
+                            d_col = sqrt((x - colony_xy[1])^2 + (y - colony_xy[2])^2)) %>%
   filter(d_col > COLONY_BUFFER_KM) %>%
   group_by(TOPPID) %>% filter(n() >= 10) %>% ungroup()
 seals <- tracks %>% distinct(TOPPID, strategy)
@@ -681,7 +673,7 @@ map_df <- bind_rows(lapply(colnames(so$U), function(s)
 gmap <- ggplot(map_df, aes(x, y)) +
   geom_contour(aes(z = vol, colour = strategy, linetype = after_stat(factor(level))),
                breaks = c(0.5, 0.95)) +
-  geom_point(data = data.frame(x = col[1], y = col[2]), shape = 17, size = 3) +
+  geom_point(data = data.frame(x = colony_xy[1], y = colony_xy[2]), shape = 17, size = 3) +
   scale_colour_manual(values = setNames(clrs, levels(dat$strategy))) +
   scale_linetype_manual(values = c(1, 2), labels = c("50%", "95%"), name = "Isopleth") +
   coord_equal() + theme_bw() +
@@ -693,8 +685,7 @@ ggsave(file.path(FIG, "strategy_UDs.pdf"), gmap, width = 7, height = 6)
 
 ## Diving niche (descriptive)
 
-PCA of the diving variables alone; nicheROVER in the first two diving
-PCs.
+PCA of the diving variables alone; nicheROVER in the first two diving PCs.
 
 ```{r dive-niche}
 pca_dive <- prcomp(dat[DIVE], scale. = TRUE)
@@ -713,14 +704,13 @@ round(apply(dive.over, c(1:2, 4), mean)[, , 1] * 100, 1)
 ## How much overlap does clustering alone create? (null model)
 
 Seals are simulated from a single multivariate normal with the observed
-correlation among the 19 behavioural variables — no strategies — then
-run through the same pipeline (MFA → K clusters). The overlap between
-these artificial clusters is what would be found even if strategies did
-not exist. Observed overlaps are computed with the same plug-in
-estimator so they are directly comparable. The comparison is made for
-(i) the MFA space — the kind of space the original nicheROVER analysis
-used — and (ii) the diving-PC space. Isotopic niches need no null:
-isotopes were not used for clustering.
+correlation among the 19 behavioural variables — no strategies — then run
+through the same pipeline (MFA → K clusters). The overlap between these
+artificial clusters is what would be found even if strategies did not exist.
+Observed overlaps are computed with the same plug-in estimator so they are
+directly comparable. The comparison is made for (i) the MFA space — the kind of
+space the original nicheROVER analysis used — and (ii) the diving-PC space.
+Isotopic niches need no null: isotopes were not used for clustering.
 
 ```{r null-overlap}
 R_behav <- cor(dat[BEHAV])
@@ -752,9 +742,9 @@ write.csv(null_tab, file.path(OUT, "overlap_null_model.csv"), row.names = FALSE)
 ```
 
 Interpretation: if the observed overlap is far below the null range, the
-strategies are more distinct than clustering alone would produce. The
-*size* of the null overlap shows why overlap in the clustering space
-cannot by itself be reported as evidence of niche partitioning.
+strategies are more distinct than clustering alone would produce. The *size* of
+the null overlap shows why overlap in the clustering space cannot by itself be
+reported as evidence of niche partitioning.
 
 # Summary
 

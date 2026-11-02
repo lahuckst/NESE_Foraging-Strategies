@@ -1,0 +1,525 @@
+---
+title: "NESE Post-Breeding females: robustness of the number of PCs and clusters"
+author: "Luis Huckstadt"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.align = "center", fig.width = 7, fig.height = 4.5)
+```
+
+# Purpose
+
+This document accompanies `NESE_HCPC_PostBreeding.Rmd`. It does not replace the
+original analysis; it tests whether its two key choices — **5 principal
+components** and **3 clusters** — are justified and whether the resulting
+foraging strategies are robust. It is organised as:
+
+1. Data checks (duplicates, skewness, multivariate outliers)
+2. Number of PCs: Kaiser, cumulative variance, broken stick, parallel analysis,
+   bootstrap eigenvalue CIs and bootstrap stability of the PC axes
+3. Number of clusters: HCPC's own criterion (without forcing `min = 3`), gap
+   statistic, silhouette, Calinski–Harabasz, NbClust (Ward.D2), Gaussian mixture
+   BIC, and a null-model test against a single multivariate Gaussian
+4. Stability: whole-pipeline bootstrap Jaccard per cluster (Hennig 2007)
+5. Sensitivity: number of PCs, isotopes in/out, transformations, clustering
+   algorithm, outlier removal, leave-one-variable-out
+6. nicheROVER: prior and dimensionality sensitivity
+7. Summary of decisions and suggested Methods text
+
+All random steps are seeded. Increase `N_BOOT`/`N_SIM` for the final run.
+
+```{r libraries}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(FactoMineR)
+library(factoextra)
+library(cluster)   # silhouette, clusGap
+library(fpc)       # calinhara
+library(mclust)    # Mclust, adjustedRandIndex
+library(NbClust)
+library(nicheROVER)
+
+set.seed(20261028)
+
+N_BOOT <- 500   # bootstrap replicates (eigenvalues, Jaccard)
+N_PERM <- 1000  # parallel-analysis permutations
+N_SIM  <- 500   # null-model simulations
+K_MAX  <- 8
+
+OUT <- "../results/robustness"
+FIG <- "../figures/robustness"
+dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
+dir.create(FIG, recursive = TRUE, showWarnings = FALSE)
+```
+
+# Data
+
+Variables are selected **by name**, not by column position (`[5:25]`), so the
+analysis cannot silently change if the data frame is re-ordered.
+
+```{r data}
+ANALYSIS_VARS <- c(
+  "d13C", "d15N", "MaxLat_degrees", "MinLon_degrees",
+  "MedianDistToContShelf_km", "SdDistContShelf_km",
+  "MesoEcoProportionShelf", "MesoEcoProportionCAC",
+  "MesoEcoProportionSubArcticPac", "MesoEcoProportionNorthCPac",
+  "Mean_Depth_m", "Mean_Depth_sd", "Mean_Duration_sec", "Mean_Duration_sd",
+  "Pct_TransitDives", "Pct_ForagingDives", "Pct_DriftDives", "Pct_BenthicDives",
+  "PctTripDiving", "DeepDayForageDivesMedian_m", "DeepNightForageDivesMedian_m")
+ISO_VARS <- c("d13C", "d15N")
+
+f.PCAdata.1 <- readRDS("../data/f.PCAdata.1.rds")
+pb <- f.PCAdata.1 %>% filter(Trip == "PostBreeding") %>% as.data.frame()
+rownames(pb) <- pb$TOPPID
+
+stopifnot(all(ANALYSIS_VARS %in% names(pb)))
+stopifnot(!anyDuplicated(pb$TOPPID))             # one trip per seal
+stopifnot(all(complete.cases(pb[ANALYSIS_VARS])))
+X <- pb[ANALYSIS_VARS]
+n <- nrow(X); p <- ncol(X)
+cat("n =", n, "seals; p =", p, "variables\n")
+table(pb$ProcedureYear)
+```
+
+## Skewness and multivariate outliers
+
+PCA and Ward clustering are least-squares methods, so strongly skewed variables
+and extreme individuals can dominate them.
+
+```{r skew-outliers}
+skew <- function(x) { z <- (x - mean(x)) / sd(x); mean(z^3) }
+sort(round(sapply(X, skew), 2))
+
+pca0 <- prcomp(X, center = TRUE, scale. = TRUE)
+S5 <- scale(pca0$x[, 1:5])
+md2 <- rowSums(S5^2)                             # squared Mahalanobis in 5-PC space
+cutoff <- qchisq(0.999, df = 5)
+data.frame(TOPPID = names(md2), MD2 = round(md2, 1)) %>%
+  arrange(desc(MD2)) %>% head(8) %>%
+  mutate(beyond_0.999 = MD2 > cutoff)
+```
+
+# How many principal components?
+
+```{r helpers-pca}
+zs <- function(X) scale(as.matrix(X))
+eig_of <- function(Z) eigen(cor(Z), symmetric = TRUE, only.values = TRUE)$values
+
+broken_stick <- function(p) sapply(1:p, function(k) sum(1 / (k:p)))
+
+parallel_analysis <- function(Z, B = N_PERM, q = 0.95) {
+  sims <- replicate(B, eig_of(apply(Z, 2, sample)))
+  apply(sims, 1, quantile, probs = q)
+}
+
+boot_eigen <- function(Z, B = N_BOOT) {
+  t(replicate(B, eig_of(Z[sample(nrow(Z), replace = TRUE), ])))
+}
+
+pc_table <- function(X) {
+  Z <- zs(X); ev <- eig_of(Z); bt <- boot_eigen(Z)
+  data.frame(PC = seq_along(ev), eigenvalue = ev,
+             pct_var = 100 * ev / sum(ev), cum_pct = 100 * cumsum(ev) / sum(ev),
+             broken_stick = broken_stick(ncol(Z)),
+             PA_95 = parallel_analysis(Z),
+             boot_lo = apply(bt, 2, quantile, 0.025),
+             boot_hi = apply(bt, 2, quantile, 0.975))
+}
+
+pc_rules <- function(tab) c(
+  `Kaiser (eigenvalue > 1)`   = sum(tab$eigenvalue > 1),
+  `Cumulative variance >=75%` = which(tab$cum_pct >= 75)[1],
+  `Cumulative variance >=80%` = which(tab$cum_pct >= 80)[1],
+  `Broken stick`              = which(tab$eigenvalue <= tab$broken_stick)[1] - 1,
+  `Parallel analysis (95%)`   = which(tab$eigenvalue <= tab$PA_95)[1] - 1)
+```
+
+```{r npc}
+pc_all   <- pc_table(X)
+pc_noiso <- pc_table(X[setdiff(ANALYSIS_VARS, ISO_VARS)])
+round(head(pc_all, 10), 3)
+rules <- cbind(all_21 = pc_rules(pc_all), no_isotopes = pc_rules(pc_noiso))
+rules
+write.csv(pc_all, file.path(OUT, "PB_PC_retention_table.csv"), row.names = FALSE)
+write.csv(rules,  file.path(OUT, "PB_PC_retention_rules.csv"))
+
+# Can successive eigenvalues be distinguished? (bootstrap CIs overlap = no)
+data.frame(PC = 1:8,
+           separable_from_next = pc_all$boot_lo[1:8] > pc_all$boot_hi[2:9])
+```
+
+```{r npc-plot}
+g <- pc_all %>% filter(PC <= 10) %>%
+  ggplot(aes(PC, eigenvalue)) +
+  geom_ribbon(aes(ymin = boot_lo, ymax = boot_hi), fill = "grey80") +
+  geom_line() + geom_point(size = 2) +
+  geom_line(aes(y = PA_95, colour = "Parallel analysis 95%"), linetype = 2) +
+  geom_line(aes(y = broken_stick, colour = "Broken stick"), linetype = 3) +
+  geom_hline(yintercept = 1, colour = "grey40", linetype = 5) +
+  scale_x_continuous(breaks = 1:10) +
+  scale_colour_manual(values = c("#d95f02", "#1b9e77"), name = NULL) +
+  labs(y = "Eigenvalue (95% bootstrap CI shaded)",
+       title = "PC retention — Post-Breeding females") +
+  theme_bw() + theme(legend.position = "bottom")
+g
+ggsave(file.path(FIG, "PB_PC_retention.pdf"), g, width = 7, height = 4.5)
+```
+
+## Are the individual PC axes stable?
+
+Tucker's congruence between full-data loadings and bootstrap loadings
+(> 0.85 = fair similarity, > 0.95 = equal; Lorenzo-Seva & ten Berge 2006). The
+subspace measure (mean squared cosine of principal angles) asks whether the
+*space* spanned by the first q PCs is stable even if individual axes rotate.
+
+```{r axis-stability}
+congruence <- function(A, B) abs(crossprod(A, B)) /
+  sqrt(outer(colSums(A^2), colSums(B^2)))
+sub_cos2 <- function(A, B) {               # A, B: orthonormal p x q
+  mean(svd(crossprod(A, B))$d^2)
+}
+V <- pca0$rotation
+tuck <- matrix(NA, N_BOOT, 6); subsp <- matrix(NA, N_BOOT, 4,
+                                               dimnames = list(NULL, paste0("q", 3:6)))
+for (b in 1:N_BOOT) {
+  Vb <- prcomp(X[sample(n, replace = TRUE), ], scale. = TRUE)$rotation
+  tuck[b, ] <- apply(congruence(V[, 1:6], Vb[, 1:8]), 1, max)
+  subsp[b, ] <- sapply(3:6, function(q) sub_cos2(V[, 1:q], Vb[, 1:q]))
+}
+data.frame(PC = 1:6,
+           congruence_median = apply(tuck, 2, median),
+           P_above_0.85 = colMeans(tuck > 0.85)) %>% round(2)
+round(apply(subsp, 2, quantile, c(0.025, 0.5)), 3)
+```
+
+**Interpretation (results from the current data set).** Kaiser and the 75 %
+threshold give 5 PCs; the broken-stick model and parallel analysis — the two
+criteria that compare eigenvalues against what is expected without structure —
+both give **4**. PC5 (eigenvalue 1.43) falls below the 95 % parallel-analysis
+threshold (≈ 1.50) and its bootstrap CI overlaps both PC4 and PC6. PC1 and PC2
+are stable axes; PCs 3–5 are not individually stable (they rotate into one
+another across bootstraps) although the 4–5-dimensional subspace is. Practical
+consequences:
+
+* Retaining **4 PCs** is the better-justified choice; but see Section 5 — the
+  clusters are identical for any number of PCs from 3 to 21, so this choice
+  does not affect the cluster assignments.
+* Interpretation of PC3–PC5 *individually* (e.g. "PC3 = shelf use") should be
+  hedged; cluster profiles on the original variables are safer.
+* The varimax rotation in the original script replaces `res.pca$var$coord` but
+  HCPC uses the *unrotated* individual coordinates, so the rotation affects only
+  the reported loadings, not the clusters. Report it as such, or drop it.
+
+# How many clusters?
+
+`hcpc_lite()` reproduces `FactoMineR::HCPC()` (Ward on PC coordinates,
+then k-means consolidation from the Ward centroids) quickly enough to be used
+inside bootstrap loops. The chunk checks that it gives the same answer.
+
+```{r helpers-cluster}
+hcpc_lite <- function(S, k, consol = TRUE) {
+  cl <- cutree(hclust(dist(S), method = "ward.D2"), k)
+  if (!consol) return(cl)
+  cen <- apply(S, 2, function(x) tapply(x, cl, mean))
+  kmeans(S, centers = cen, iter.max = 100)$cluster
+}
+within_inertia <- function(S, kmax = 15) {
+  h <- hclust(dist(S), method = "ward.D2")
+  gains <- sort(h$height^2 / (2 * nrow(S)), decreasing = TRUE)
+  sapply(1:kmax, function(k) sum(gains[k:length(gains)]))
+}
+# HCPC's automatic rule: minimise W(k)/W(k-1) over min..max
+hcpc_ratio <- function(S, kmin = 2, kmax = 10) {
+  W <- within_inertia(S, kmax + 1)
+  setNames(W[kmin:kmax] / W[(kmin - 1):(kmax - 1)], kmin:kmax)
+}
+pc_scores <- function(X, npc) {
+  pr <- prcomp(X, center = TRUE, scale. = TRUE)
+  if (is.null(npc)) scale(X) else pr$x[, 1:npc, drop = FALSE]
+}
+```
+
+```{r reproduce}
+res.pca <- PCA(X, ncp = 5, graph = FALSE)
+ref.hcpc <- HCPC(res.pca, nb.clust = 3, consol = TRUE, graph = FALSE)
+REF <- as.integer(ref.hcpc$data.clust$clust)
+table(REF)
+adjustedRandIndex(REF, hcpc_lite(res.pca$ind$coord, 3))  # should be 1
+```
+
+## HCPC's own criterion — without forcing a minimum of 3
+
+The original call `HCPC(..., min = 3, max = 10)` cannot return k = 2.
+
+```{r hcpc-criterion}
+S5 <- res.pca$ind$coord
+q <- hcpc_ratio(S5, 2, 10)
+round(q, 3)
+cat("HCPC suggests k =", names(which.min(q)), "when min = 2;",
+    names(which.min(q[-1])), "when min = 3\n")
+```
+
+## Internal indices across numbers of PCs
+
+```{r k-grid}
+k_grid <- do.call(rbind, lapply(2:8, function(npc) {
+  S <- pc_scores(X, npc); d <- dist(S); qq <- hcpc_ratio(S, 2, K_MAX)
+  do.call(rbind, lapply(2:K_MAX, function(k) {
+    cl <- hcpc_lite(S, k)
+    data.frame(nPC = npc, k = k, min_size = min(table(cl)),
+               silhouette = mean(silhouette(cl, d)[, 3]),
+               CH = calinhara(S, cl), HCPC_ratio = qq[as.character(k)],
+               ARI_vs_original = adjustedRandIndex(REF, cl))
+  }))
+}))
+write.csv(k_grid, file.path(OUT, "PB_k_grid.csv"), row.names = FALSE)
+k_grid %>% filter(nPC %in% 4:5) %>% mutate(across(where(is.double), ~ round(.x, 3)))
+
+k_grid %>% group_by(nPC) %>%
+  summarise(best_silhouette = k[which.max(silhouette)],
+            best_CH = k[which.max(CH)],
+            HCPC_rule = k[which.min(HCPC_ratio)])
+```
+
+Note `min_size`: from k = 4 onward the extra "cluster" is a single seal.
+
+## Gap statistic
+
+```{r gap}
+gap_list <- lapply(c(4, 5), function(npc) {
+  S <- pc_scores(X, npc)
+  gs <- clusGap(S, FUNcluster = function(x, k) list(cluster = hcpc_lite(x, k)),
+                K.max = K_MAX, B = 200, spaceH0 = "scaledPCA", verbose = FALSE)
+  print(gs, method = "Tibs2001SEmax")
+  gs
+})
+```
+
+## NbClust (Ward.D2)
+
+The original script used `method = "ward.D"` with Euclidean (unsquared)
+distances, which is not Ward's criterion; `"ward.D2"` is.
+
+```{r nbclust, results='hide', fig.show='hide'}
+nb <- lapply(c(4, 5), function(npc)
+  tryCatch(NbClust(pc_scores(X, npc), distance = "euclidean", min.nc = 2,
+                   max.nc = K_MAX, method = "ward.D2", index = "all"),
+           error = function(e) NULL))
+```
+
+```{r nbclust-show}
+lapply(nb, function(x) if (!is.null(x)) table(x$Best.nc[1, ]))
+```
+
+## Gaussian mixture models (BIC, including k = 1)
+
+```{r mclust}
+bic4 <- mclustBIC(pc_scores(X, 4), G = 1:6)
+bic5 <- mclustBIC(pc_scores(X, 5), G = 1:6)
+summary(bic4); summary(bic5)
+plot(bic4)
+```
+
+## Is there cluster structure at all? Null-model test
+
+Data are simulated from a single multivariate Gaussian with the observed PC
+variances (i.e. no clusters), clustered with the same pipeline, and compared
+with the observed silhouette and CH.
+
+```{r null-test}
+null_test <- function(npc, k, B = N_SIM) {
+  S <- pc_scores(X, npc); cl <- hcpc_lite(S, k); sds <- apply(S, 2, sd)
+  obs <- c(sil = mean(silhouette(cl, dist(S))[, 3]), CH = calinhara(S, cl))
+  sim <- t(replicate(B, {
+    Y <- sapply(sds, function(s) rnorm(nrow(S), 0, s)); cy <- hcpc_lite(Y, k)
+    c(sil = mean(silhouette(cy, dist(Y))[, 3]), CH = calinhara(Y, cy))
+  }))
+  data.frame(nPC = npc, k = k, obs_sil = obs["sil"], p_sil = mean(sim[, "sil"] >= obs["sil"]),
+             obs_CH = obs["CH"], p_CH = mean(sim[, "CH"] >= obs["CH"]))
+}
+null_res <- do.call(rbind, lapply(c(4, 5), function(npc)
+  do.call(rbind, lapply(2:4, function(k) null_test(npc, k)))))
+rownames(null_res) <- NULL
+round(null_res, 3)
+```
+
+# Stability: whole-pipeline bootstrap Jaccard
+
+Each replicate resamples seals with replacement and re-runs **everything**
+(standardisation, PCA, PC retention, Ward + consolidation). For each original
+cluster the maximum Jaccard similarity to any bootstrap cluster is recorded.
+Hennig (2007): mean Jaccard < 0.5 = dissolved, 0.6–0.75 = pattern, > 0.75 =
+stable, > 0.85 = highly stable.
+
+```{r jaccard}
+boot_jaccard <- function(npc, k, vars = ANALYSIS_VARS, B = N_BOOT) {
+  ref <- hcpc_lite(pc_scores(X[vars], npc), k)
+  J <- matrix(NA, B, k)
+  for (b in 1:B) {
+    ix <- unique(sample(n, replace = TRUE))
+    cb <- hcpc_lite(pc_scores(X[ix, vars], npc), k)
+    for (c in 1:k) {
+      A <- ix[ref[ix] == c]
+      if (length(A)) J[b, c] <- max(sapply(unique(cb), function(j) {
+        Bj <- ix[cb == j]; length(intersect(A, Bj)) / length(union(A, Bj)) }))
+    }
+  }
+  data.frame(nPC = npc, k = k, cluster = 1:k, n = as.vector(table(ref)),
+             jaccard_mean = colMeans(J, na.rm = TRUE),
+             P_dissolved = colMeans(J < 0.5, na.rm = TRUE))
+}
+jac <- do.call(rbind, lapply(c(4, 5), function(npc)
+  do.call(rbind, lapply(2:4, function(k) boot_jaccard(npc, k)))))
+write.csv(jac, file.path(OUT, "PB_bootstrap_jaccard.csv"), row.names = FALSE)
+jac %>% mutate(across(c(jaccard_mean, P_dissolved), ~ round(.x, 2)))
+```
+
+# Sensitivity of the partition
+
+Each scenario is compared with the original solution (5 PCs, k = 3) by the
+adjusted Rand index (ARI = 1: identical partition). `coastal` tracks whether the
+six seals of the small cluster remain together.
+
+```{r sensitivity}
+coastal_ids <- which(REF == as.integer(names(which.min(table(REF)))))
+coastal_kept <- function(cl) {
+  best <- names(which.max(table(cl[coastal_ids])))
+  sprintf("%d/6 in group of %d", max(table(cl[coastal_ids])), sum(cl == best))
+}
+log_skewed <- function(X) {
+  v <- intersect(c("MesoEcoProportionShelf", "Pct_BenthicDives", "Mean_Duration_sec",
+                   "Mean_Duration_sd", "Mean_Depth_sd", "Pct_DriftDives",
+                   "MesoEcoProportionCAC"), names(X))
+  X[v] <- lapply(X[v], function(x) log(x + min(x[x > 0]) / 2)); X
+}
+scen <- list(
+  "nPC=2, k=3"  = hcpc_lite(pc_scores(X, 2), 3),
+  "nPC=3, k=3"  = hcpc_lite(pc_scores(X, 3), 3),
+  "nPC=4, k=3"  = hcpc_lite(pc_scores(X, 4), 3),
+  "nPC=6, k=3"  = hcpc_lite(pc_scores(X, 6), 3),
+  "nPC=8, k=3"  = hcpc_lite(pc_scores(X, 8), 3),
+  "all variables (no PCA), k=3" = hcpc_lite(pc_scores(X, NULL), 3),
+  "nPC=4, k=2"  = hcpc_lite(pc_scores(X, 4), 2),
+  "Ward, no consolidation" = hcpc_lite(pc_scores(X, 5), 3, consol = FALSE),
+  "k-means (100 starts)" = kmeans(pc_scores(X, 5), 3, nstart = 100)$cluster,
+  "Gaussian mixture (VVI)" = Mclust(pc_scores(X, 5), G = 3, modelNames = "VVI")$classification,
+  "No isotopes, nPC=4" = hcpc_lite(pc_scores(X[setdiff(ANALYSIS_VARS, ISO_VARS)], 4), 3),
+  "Log-transformed skewed vars, nPC=4" = hcpc_lite(pc_scores(log_skewed(X), 4), 3),
+  "Rank-transformed, nPC=4" = hcpc_lite(pc_scores(as.data.frame(lapply(X, rank)), 4), 3)
+)
+sens <- data.frame(scenario = names(scen),
+                   sizes = sapply(scen, function(cl) paste(sort(table(cl), TRUE), collapse = "/")),
+                   ARI = sapply(scen, function(cl) round(adjustedRandIndex(REF, cl), 3)),
+                   coastal = sapply(scen, coastal_kept), row.names = NULL)
+
+# Drop the most extreme individual
+md_out <- names(which.max(md2))
+keep <- rownames(X) != md_out
+cl_drop <- hcpc_lite(pc_scores(X[keep, ], 5), 3)
+sens <- rbind(sens, data.frame(scenario = paste("Drop outlier", md_out),
+  sizes = paste(sort(table(cl_drop), TRUE), collapse = "/"),
+  ARI = round(adjustedRandIndex(REF[keep], cl_drop), 3), coastal = "-"))
+write.csv(sens, file.path(OUT, "PB_sensitivity.csv"), row.names = FALSE)
+sens
+
+# Leave-one-variable-out
+lovo <- sapply(ANALYSIS_VARS, function(v)
+  adjustedRandIndex(REF, hcpc_lite(pc_scores(X[setdiff(ANALYSIS_VARS, v)], 5), 3)))
+sort(round(lovo, 3))
+```
+
+## Cluster profiles on the original variables
+
+Separation on clustering variables is descriptive, not independent validation.
+
+```{r profiles, fig.width = 9, fig.height = 4}
+prof <- data.frame(scale(X), cluster = factor(REF)) %>%
+  pivot_longer(-cluster) %>% group_by(cluster, name) %>%
+  summarise(mean_z = mean(value), .groups = "drop")
+gp <- ggplot(prof, aes(name, cluster, fill = mean_z)) + geom_tile() +
+  scale_fill_gradient2(low = "#2166ac", high = "#b2182b") + theme_bw() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  labs(x = NULL, y = "Cluster", fill = "Mean z")
+gp
+ggsave(file.path(FIG, "PB_cluster_profiles.pdf"), gp, width = 10, height = 4)
+table(cluster = REF, year = pb$ProcedureYear)
+```
+
+# nicheROVER: prior and dimensionality
+
+The original script used `Psi <- crossprod(matrix(rnorm(d^2), d, d))` without a
+seed. This is an **informative, random** prior on Σ: it changes on every run
+and is added to the cluster's scatter matrix. With n = 6 in 5 dimensions the
+prior dominates the posterior for the small cluster. Here the default
+(non-informative) `niw.post` prior is compared with several random draws.
+
+```{r niche-prior}
+niche_size_med <- function(Y, Psi = NULL, alpha = 0.75, ns = 2000) {
+  post <- if (is.null(Psi)) niw.post(nsamples = ns, X = Y)
+          else niw.post(nsamples = ns, X = Y, Psi = Psi)
+  median(apply(post$Sigma, 3, niche.size, alpha = alpha))
+}
+prior_check <- do.call(rbind, lapply(c(4, 5), function(d) {
+  S <- res.pca$ind$coord[, 1:d]
+  do.call(rbind, lapply(sort(unique(REF)), function(c) {
+    Y <- S[REF == c, , drop = FALSE]
+    rnd <- replicate(20, niche_size_med(Y, crossprod(matrix(rnorm(d^2), d, d))))
+    data.frame(d = d, cluster = c, n = nrow(Y),
+               default_prior = niche_size_med(Y),
+               random_Psi_min = min(rnd), random_Psi_max = max(rnd))
+  }))
+}))
+prior_check %>% mutate(across(4:6, ~ round(.x, 1)))
+```
+
+Recommendations for the niche analysis:
+
+* Use the default prior (`niw.post(nsamples, X)`) or a documented, fixed prior,
+  and `set.seed()` before each call.
+* Use the number of PCs justified above (4), and report that niche size and
+  overlap are rotation-invariant (so the PC-axis instability does not affect
+  them) but that their *scale* depends on d.
+* Treat the coastal cluster (n = 6) cautiously: with n − 1 = d the covariance is
+  barely identifiable. Report its niche metrics with that caveat, or compare
+  niches in a lower-dimensional space (e.g. PC1–PC2, or δ¹³C–δ¹⁵N) where n ≫ d.
+
+# Summary and suggested Methods text
+
+```{r session}
+sessionInfo()
+```
+
+**Number of PCs.** *We retained principal components using Horn's parallel
+analysis (1,000 column permutations, 95th percentile) and the broken-stick
+model, which both supported four components (71.4 % of variance); Kaiser's
+criterion and a 75 % cumulative-variance threshold suggested five. Because
+cluster assignments were identical for any number of retained components
+between three and all 21 standardised variables (ARI = 1), this choice did not
+affect the identification of foraging strategies.*
+
+**Number of clusters.** *The number of clusters was assessed with HCPC's
+inertia-gain criterion, the gap statistic, mean silhouette width, the
+Calinski–Harabasz index and Gaussian-mixture BIC, and the stability of each
+cluster was quantified with a whole-pipeline bootstrap (500 replicates;
+Hennig 2007). The dominant partition separated two offshore groups
+(k = 2 preferred by the HCPC criterion); the gap statistic supported k = 3 for
+all numbers of PCs, the third cluster being a small coastal/California-Current
+group. Solutions with k ≥ 4 only isolated single individuals. All three
+clusters were highly stable (mean bootstrap Jaccard 0.99, 0.97–0.98 and
+0.88–0.91 with four and five PCs respectively), and
+clustering quality exceeded that expected from a single multivariate Gaussian
+(silhouette, p < 0.002). The partition was unchanged after excluding stable
+isotopes, log-transforming skewed variables, removing the most extreme
+individual, or omitting any one of 19 of the 21 variables.*
+
+(Numbers in italics are from the run of 2026-10-28; update them from the knitted
+output.)
