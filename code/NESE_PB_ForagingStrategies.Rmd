@@ -54,7 +54,12 @@ set.seed(SEED)
 
 # Part A
 N_DIM_OVERRIDE  <- NULL   # NULL = use parallel analysis; or set a number
-K_OVERRIDE      <- NULL   # NULL = use the decision rule below; or set a number
+# K = 3 rather than the 1-SE gap choice of 2: gap(3) > gap(2) but within 1 SE, so
+# the gap statistic does not discriminate between them; k = 3 has the highest
+# silhouette among admissible solutions, all three strategies are stable, k = 3 is a
+# nested refinement of k = 2, and the split-off group differs in variables NOT used
+# for clustering (trip duration, mass gain, isotopes). See "Choosing between k = 2 and k = 3".
+K_OVERRIDE      <- 3      # NULL = use the decision rule below; or set a number
 K_RANGE         <- 2:8    # candidate numbers of strategies
 MIN_CLUSTER_N   <- 5      # smallest acceptable strategy (individuals)
 MIN_JACCARD     <- 0.75   # every strategy must be at least "stable" (Hennig 2007)
@@ -99,7 +104,8 @@ REGIONS <- c(MesoEcoProportionShelf        = "Shelf",
 
 ```{r load}
 meta <- read.csv("../data/IsotopesDatasetForLuis_2023_4_4.csv") %>%
-  transmute(TOPPID = as.character(TOPPID), MainID = as.character(MainID)) %>%
+  transmute(TOPPID = as.character(TOPPID), MainID = as.character(MainID),
+            TripDuration_days, MassGainRate_kgPerDay_Dcrocker) %>%
   distinct(TOPPID, .keep_all = TRUE)
 
 dat <- readRDS("../data/f.PCAdata.1.rds") %>%
@@ -319,6 +325,84 @@ g <- ggplot(kp, aes(k, value)) + geom_line() + geom_point() +
 g
 ggsave(file.path(FIG, "A_number_of_strategies.pdf"), g, width = 6, height = 7)
 ```
+
+## Choosing between k = 2 and k = 3
+
+Internal criteria cannot settle every choice: when two solutions are close,
+the choice should rest on (i) whether the finer solution is a refinement of the
+coarser one, (ii) whether the extra group is reproducible, and (iii) whether it
+differs in variables that were **not** used to build the clusters (external
+validation; Hennig 2015, *Pattern Recognition Letters* 64:53–62).
+
+### 1. What the gap statistic actually says
+
+The 1-SE rule picks the *smallest* k whose gap is within one standard error of
+the next; it is deliberately conservative. Other standard rules (Tibshirani et
+al. 2001; Dudoit & Fridlyand 2002) are shown for comparison.
+
+```{r k2-vs-k3-gap}
+sapply(c("Tibs2001SEmax", "firstSEmax", "firstmax", "globalSEmax", "globalmax"),
+       function(m) maxSE(gs$Tab[, "gap"], gs$Tab[, "SE.sim"], method = m))
+k_tab %>% filter(k %in% 2:4) %>%
+  dplyr::select(k, gap, gap_se, silhouette, sizes, min_size, min_jaccard, passes) %>%
+  mutate(across(where(is.double), ~ round(.x, 3)))
+```
+
+### 2. Is k = 3 a refinement of k = 2, and is the extra group stable?
+
+```{r k2-vs-k3-nesting}
+l2 <- stab[["2"]]$ref; l3 <- stab[["3"]]$ref
+table(`k = 2` = l2, `k = 3` = l3)
+new_grp   <- as.integer(names(which.min(table(l3))))                 # group added at k = 3
+parent    <- as.integer(names(which.max(table(l2[l3 == new_grp])))) # k = 2 cluster it comes from
+in_parent <- l2 == parent
+split_grp <- l3 == new_grp & in_parent
+cat("k = 3 separates", sum(split_grp), "seals from a k = 2 cluster of", sum(in_parent),
+    "; Jaccard stability of that group:", round(stab[["3"]]$jaccard[new_grp], 2), "\n")
+
+# How the split-off group differs behaviourally from the rest of its parent cluster
+data.frame(scale(dat[BEHAV]))[in_parent, ] %>%
+  mutate(group = ifelse(split_grp[in_parent], "split-off group", "rest of parent")) %>%
+  group_by(group) %>% summarise(across(everything(), mean)) %>%
+  pivot_longer(-group, names_to = "variable") %>%
+  pivot_wider(names_from = group, values_from = value) %>%
+  mutate(difference_z = `split-off group` - `rest of parent`) %>%
+  arrange(desc(abs(difference_z))) %>% head(8) %>%
+  mutate(across(where(is.double), ~ round(.x, 2)))
+```
+
+### 3. External validation: does the split-off group differ in variables not used for clustering?
+
+Permutation test (difference in means, two-sided) between the split-off group
+and the rest of the cluster it comes from. Trip duration and mass-gain rate are
+completely independent of the clustering. Isotopes are shown too, but note
+that if they are used to justify k they are no longer a fully independent test
+in Part B — report this transparently.
+
+```{r k2-vs-k3-external}
+perm_diff <- function(x, g, B = N_PERM) {
+  obs  <- mean(x[g]) - mean(x[!g])
+  null <- replicate(B, { s <- sample(g); mean(x[s]) - mean(x[!s]) })
+  c(n_split = sum(g), n_rest = sum(!g),
+    mean_split = mean(x[g]), mean_rest = mean(x[!g]),
+    difference = obs, p_perm = (1 + sum(abs(null) >= abs(obs))) / (B + 1))
+}
+ext_vars <- intersect(c("TripDuration_days", "MassGainRate_kgPerDay_Dcrocker", ISO), names(dat))
+set.seed(SEED)
+split_tests <- t(sapply(ext_vars, function(v) {
+  ok <- in_parent & !is.na(dat[[v]])
+  perm_diff(dat[[v]][ok], split_grp[ok])
+}))
+round(split_tests, 4)
+write.csv(split_tests, file.path(OUT, "A_k2_vs_k3_external_validation.csv"))
+```
+
+**Interpretation.** If the split-off group is (i) nested within a k = 2
+cluster, (ii) stable (Jaccard ≥ 0.75), and (iii) different in independent
+variables, the k = 3 solution captures real biological structure that k = 2
+merges. The two solutions are then best presented as two levels of one
+hierarchy: two main offshore modes, one of which contains a small, distinct
+strategy.
 
 ## Final HCPC
 
@@ -547,6 +631,16 @@ write.csv(bind_rows(iso_tests), file.path(OUT, "B_isotope_tests.csv"), row.names
 write.csv(contr, file.path(OUT, "B_isotope_contrasts.csv"), row.names = FALSE)
 ```
 
+### Isotopic differences with k = 2 vs k = 3
+
+```{r iso-k2-k3}
+set.seed(SEED)
+bind_rows(lapply(2:3, function(k) {
+  d <- dat; d$strategy <- factor(stab[[as.character(k)]]$ref)
+  bind_rows(lapply(ISO, function(v) fl_test(d, v, covars = "ProcedureYear"))) %>% mutate(k = k)
+})) %>% dplyr::select(k, response, n, F, p_perm) %>% mutate(across(c(F, p_perm), ~ signif(.x, 3)))
+```
+
 ### Equivalence: are some strategies isotopically indistinguishable?
 
 A non-significant test is not evidence of no difference. Two one-sided tests
@@ -688,10 +782,18 @@ were standardised and summarised by principal component analysis; the number of
 components was chosen by Horn's parallel analysis (1,000 permutations, 95th
 percentile). Individuals were clustered on the retained components by Ward's
 hierarchical clustering followed by k-means consolidation (HCPC; FactoMineR).
-The number of strategies was chosen as that supported by the gap statistic
-(Tibshirani et al. 2001; 1-SE rule) provided that all strategies contained at
-least five individuals and were stable under a whole-pipeline bootstrap (500
-resamples; mean Jaccard ≥ 0.75, Hennig 2007). Robustness was assessed by
+Candidate solutions (k = 2–8) were evaluated with the gap statistic
+(Tibshirani et al. 2001), mean silhouette width, minimum cluster size and
+stability under a whole-pipeline bootstrap (500 resamples; mean Jaccard,
+Hennig 2007). Solutions with k ≥ 4 only isolated single individuals and were
+unstable. The gap statistic increased from k = 2 to k = 3 but by less than one
+standard error, so it did not discriminate between them (the conservative 1-SE
+rule returns k = 2). We retained k = 3 because it was a nested refinement of
+k = 2 (separating six individuals from one of the two k = 2 clusters), had the
+highest silhouette width among admissible solutions, all three groups were
+stable (Jaccard ≥ 0.85), and the additional group differed from the rest of its
+parent cluster in variables not used for clustering (trip duration, mass-gain
+rate; permutation tests). Robustness was assessed by
 comparing partitions (adjusted Rand index) obtained with ±1 component,
 multiple factor analysis weighting spatial and diving variables equally,
 log-transformation of skewed variables, removal of redundant variables and of
