@@ -58,14 +58,14 @@ K_OVERRIDE      <- NULL   # NULL = use the decision rule below; or set a number
 K_RANGE         <- 2:8    # candidate numbers of strategies
 MIN_CLUSTER_N   <- 5      # smallest acceptable strategy (individuals)
 MIN_JACCARD     <- 0.75   # every strategy must be at least "stable" (Hennig 2007)
-N_PA            <- 100#1000   # parallel-analysis permutations
+N_PA            <- 1000   # parallel-analysis permutations
 N_GAP           <- 200    # gap-statistic reference data sets
-N_BOOT          <- 50#500    # bootstrap replicates for stability
+N_BOOT          <- 500    # bootstrap replicates for stability
 SKEW_THRESHOLD  <- 1      # |skewness| above which variables are log-transformed in the sensitivity run
 
 # Part B
-N_PERM          <- 499#4999   # permutations for Freedman-Lane tests
-N_POST          <- 2000#1e4    # nicheROVER posterior draws
+N_PERM          <- 4999   # permutations for Freedman-Lane tests
+N_POST          <- 1e4    # nicheROVER posterior draws
 LOW_CONFIDENCE  <- 0.80   # seals with bootstrap co-assignment below this are "low confidence"
 # Equivalence margins (permil): differences smaller than these are considered
 # ecologically negligible. Biological judgement - justify in the paper.

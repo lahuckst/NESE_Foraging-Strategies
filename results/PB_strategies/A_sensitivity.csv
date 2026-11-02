@@ -1,0 +1,11 @@
+"scenario","ARI"
+"Dimensions = 3",1
+"Dimensions = 5",1
+"Dimensions = 19",1
+"MFA (blocks weighted equally)",1
+"Log-transform skewed variables",1
+"Drop redundant SdDist + NorthCPac",0.794
+"Ward without consolidation",0.794
+"k-means (100 starts)",1
+"Without multivariate outliers",1
+"One trip per seal",1
