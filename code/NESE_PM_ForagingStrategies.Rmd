@@ -1,0 +1,1004 @@
+---
+title: "NESE Post-Moult females: foraging strategies from behaviour and their isotopic niches"
+author: "Luis Huckstadt"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.align = "center", fig.width = 7, fig.height = 4.5)
+```
+
+# Overview
+
+A self-contained analysis, built from scratch, in two parts.
+
+**Part A — Identify foraging strategies from behaviour.** Movement and diving
+variables only (19 variables). PCA → number of dimensions chosen by parallel
+analysis → HCPC (Ward + k-means consolidation). The number of strategies is
+chosen with explicit, data-driven rules: the gap statistic, a minimum cluster
+size, and bootstrap stability. Every choice is followed by a sensitivity check.
+
+**Part B — Isotopic niches of those strategies.** Stable isotopes are **not**
+used in Part A, so they are an independent test of whether behaviourally
+defined strategies also differ in diet / foraging habitat: permutation tests,
+effect sizes, equivalence tests and Bayesian niche size and overlap
+(nicheROVER, SEA).
+
+This is the Post-Moult version of `NESE_PB_ForagingStrategies.Rmd`: same
+variables, same rules, same tests, so the two trips are directly comparable.
+Differences from the Post-Breeding script: trips with impossible values are
+flagged and excluded, the number of strategies is left to the decision rule,
+a null-model test checks whether there is cluster structure at all, the
+"one more strategy?" check is generic (K vs K + 1), and strategies are compared
+with each seal's Post-Breeding strategy.
+
+All random steps are seeded. For a first test run, lower `N_BOOT`, `N_PERM`,
+`N_PA` and `N_POST` in the settings chunk.
+
+```{r libraries}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(FactoMineR)
+library(factoextra)
+library(cluster)     # clusGap, silhouette
+# mclust is called as mclust::adjustedRandIndex (attaching it masks dplyr::count)
+library(nicheROVER)
+# MASS is called as MASS:: to avoid masking dplyr::select
+```
+
+# Settings
+
+```{r settings}
+SEED <- 20261102
+set.seed(SEED)
+
+# Part A
+N_DIM_OVERRIDE  <- NULL   # NULL = use parallel analysis; or set a number
+K_OVERRIDE      <- NULL   # NULL = use the decision rule below; or set a number
+EXCLUDE_INVALID <- TRUE   # drop trips with impossible values (percent > 100, proportion > 1)
+N_NULL          <- 500    # simulations for the "is there cluster structure?" test
+K_RANGE         <- 2:8    # candidate numbers of strategies
+MIN_CLUSTER_N   <- 5      # smallest acceptable strategy (individuals)
+MIN_JACCARD     <- 0.75   # every strategy must be at least "stable" (Hennig 2007)
+N_PA            <- 1000   # parallel-analysis permutations
+N_GAP           <- 200    # gap-statistic reference data sets
+N_BOOT          <- 500    # bootstrap replicates for stability
+SKEW_THRESHOLD  <- 1      # |skewness| above which variables are log-transformed in the sensitivity run
+
+# Part B
+N_PERM          <- 4999   # permutations for Freedman-Lane tests
+N_POST          <- 1e4    # nicheROVER posterior draws
+LOW_CONFIDENCE  <- 0.80   # seals with bootstrap co-assignment below this are "low confidence"
+
+# SIBER (needs JAGS installed: https://mcmc-jags.sourceforge.io, then install.packages(c("rjags", "SIBER")))
+SIBER_PARMS  <- list(n.iter = 2e4, n.burnin = 1e3, n.thin = 10, n.chains = 2)
+SIBER_PRIORS <- list(R = 1 * diag(2), k = 2, tau.mu = 1.0E-3)   # SIBER defaults
+SIBER_DRAWS  <- 500      # posterior draws used for Bayesian ellipse overlap
+SIBER_P      <- 0.95     # ellipse used for overlap (0.95 = 95% ellipse; NULL = standard ellipse)
+HAS_SIBER <- requireNamespace("SIBER", quietly = TRUE) && requireNamespace("rjags", quietly = TRUE)
+if (!HAS_SIBER) message("SIBER/rjags (JAGS) not available: the SIBER section will be skipped.")
+# Equivalence margins (permil): differences smaller than these are considered
+# ecologically negligible. Biological judgement - justify in the paper.
+EQUIV <- c(d13C = 0.3, d15N = 0.5)
+
+OUT <- "../results/PM_strategies"
+FIG <- "../figures/PM_strategies"
+# Post-Breeding assignments (from NESE_PB_ForagingStrategies.Rmd), for the PB-PM comparison
+PB_ASSIGNMENTS <- "../results/PB_strategies/A_strategy_assignments.csv"
+dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
+dir.create(FIG, recursive = TRUE, showWarnings = FALSE)
+
+PAL <- c("#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666")
+```
+
+# Data
+
+```{r variables}
+SPACE <- c("MaxLat_degrees", "MinLon_degrees",
+           "MedianDistToContShelf_km", "SdDistContShelf_km",
+           "MesoEcoProportionShelf", "MesoEcoProportionCAC",
+           "MesoEcoProportionSubArcticPac", "MesoEcoProportionNorthCPac")
+DIVE  <- c("Mean_Depth_m", "Mean_Depth_sd", "Mean_Duration_sec", "Mean_Duration_sd",
+           "Pct_TransitDives", "Pct_ForagingDives", "Pct_DriftDives", "Pct_BenthicDives",
+           "PctTripDiving", "DeepDayForageDivesMedian_m", "DeepNightForageDivesMedian_m")
+BEHAV <- c(SPACE, DIVE)
+ISO   <- c("d13C", "d15N")
+REGIONS <- c(MesoEcoProportionShelf        = "Shelf",
+             MesoEcoProportionCAC          = "California Current",
+             MesoEcoProportionSubArcticPac = "Subarctic",
+             MesoEcoProportionNorthCPac    = "North Central Pacific")
+```
+
+```{r load}
+meta <- read.csv("../data/IsotopesDatasetForLuis_2023_4_4.csv") %>%
+  transmute(TOPPID = as.character(TOPPID), MainID = as.character(MainID),
+            TripDuration_days, MassGainRate_kgPerDay_Dcrocker) %>%
+  distinct(TOPPID, .keep_all = TRUE)
+
+dat <- readRDS("../data/f.PCAdata.1.rds") %>%
+  mutate(TOPPID = as.character(TOPPID)) %>%
+  filter(Trip == "PostMolt") %>%
+  left_join(meta, by = "TOPPID") %>%
+  mutate(ProcedureYear = factor(ProcedureYear)) %>%
+  as.data.frame()
+rownames(dat) <- dat$TOPPID
+
+stopifnot(all(c(BEHAV, ISO) %in% names(dat)), !anyDuplicated(dat$TOPPID))
+cat("Rows with missing behavioural data:", sum(!complete.cases(dat[BEHAV])), "\n")
+dat <- dat[complete.cases(dat[BEHAV]), ]
+n <- nrow(dat)
+cat(n, "Post-Moult trips from", n_distinct(dat$MainID, na.rm = TRUE), "seals\n")
+table(dat$ProcedureYear)
+```
+
+The unit of analysis is the **trip**. Seals tracked in more than one year
+contribute more than one trip; this is checked in the sensitivity analyses
+(one trip per seal).
+
+```{r repeats}
+dat %>% filter(!is.na(MainID)) %>% dplyr::count(MainID) %>% filter(n > 1)
+```
+
+## Data checks
+
+```{r checks}
+# 0. Impossible values: percentages outside 0-100, proportions outside 0-1.
+#    Check these trips in the raw data; by default they are excluded.
+pct_vars  <- grep("^Pct", BEHAV, value = TRUE)
+prop_vars <- names(REGIONS)
+bad <- dat %>% dplyr::select(TOPPID, all_of(c(pct_vars, prop_vars))) %>%
+  pivot_longer(-TOPPID, names_to = "variable") %>%
+  filter((variable %in% pct_vars  & (value < 0 | value > 100)) |
+         (variable %in% prop_vars & (value < 0 | value > 1)))
+bad
+if (EXCLUDE_INVALID && nrow(bad) > 0) {
+  dat <- dat[!dat$TOPPID %in% bad$TOPPID, ]
+  n <- nrow(dat)
+  cat("Excluded", n_distinct(bad$TOPPID), "trip(s) with impossible values; n =", n, "\n")
+}
+
+# 1. Mesoecoregion proportions are compositional (they sum to 1), so one of the
+#    four is redundant. PCA handles the exact linear dependence (one zero eigenvalue).
+summary(rowSums(dat[names(REGIONS)]))
+
+# 2. Dive-type percentages: check their definition if they do not sum to ~100
+summary(rowSums(dat[c("Pct_TransitDives", "Pct_ForagingDives",
+                      "Pct_DriftDives", "Pct_BenthicDives")]))
+
+# 3. Skewness (PCA and Ward are least-squares methods, sensitive to long tails)
+skew <- function(x) { z <- (x - mean(x)) / sd(x); mean(z^3) }
+sort(round(sapply(dat[BEHAV], skew), 2))
+
+# 4. Strongly redundant pairs (|Spearman rho| > 0.85) give extra weight to one axis
+rho <- cor(dat[BEHAV], method = "spearman"); rho[upper.tri(rho, diag = TRUE)] <- NA
+as.data.frame(as.table(rho)) %>% filter(abs(Freq) > 0.85) %>% arrange(desc(abs(Freq)))
+```
+
+# Part A — Foraging strategies from behaviour
+
+## Helper functions
+
+```{r helpers-A}
+pc_scores <- function(X, nd) prcomp(X, center = TRUE, scale. = TRUE)$x[, 1:nd, drop = FALSE]
+
+# Ward + k-means consolidation from the Ward centroids (= FactoMineR::HCPC),
+# fast enough for bootstrap loops
+hcpc_lite <- function(S, k) {
+  cl  <- cutree(hclust(dist(S), method = "ward.D2"), k)
+  cen <- apply(S, 2, function(x) tapply(x, cl, mean))
+  tryCatch(kmeans(S, centers = cen, iter.max = 100)$cluster,
+           error = function(e) cl)   # if consolidation empties a cluster, keep Ward
+}
+
+# HCPC's own rule for suggesting k: minimise W(k)/W(k-1)
+hcpc_ratio <- function(S, ks) {
+  h <- hclust(dist(S), method = "ward.D2")
+  g <- sort(h$height^2 / (2 * nrow(S)), decreasing = TRUE)
+  W <- sapply(1:(max(ks) + 1), function(k) sum(g[k:length(g)]))
+  setNames(W[ks] / W[ks - 1], ks)
+}
+
+# Whole-pipeline bootstrap: resample seals, redo PCA + clustering.
+# Returns mean Jaccard per cluster and, per seal, the proportion of resamples in
+# which it stays with its full-data cluster mates (co-assignment).
+boot_stability <- function(X, nd, k, B = N_BOOT) {
+  ref <- hcpc_lite(pc_scores(X, nd), k); m <- nrow(X)
+  J <- matrix(NA, B, k)
+  co <- seen <- numeric(m)
+  for (b in 1:B) {
+    ix <- unique(sample(m, replace = TRUE))
+    cb <- hcpc_lite(pc_scores(X[ix, , drop = FALSE], nd), k)
+    for (cc in 1:k) {
+      A <- ix[ref[ix] == cc]
+      if (length(A)) J[b, cc] <- max(sapply(unique(cb), function(j) {
+        Bj <- ix[cb == j]; length(intersect(A, Bj)) / length(union(A, Bj)) }))
+    }
+    lab <- setNames(cb, ix)
+    for (i in ix) {
+      mates <- setdiff(ix[ref[ix] == ref[i]], i)
+      if (length(mates)) {
+        co[i] <- co[i] + mean(lab[as.character(mates)] == lab[as.character(i)])
+        seen[i] <- seen[i] + 1
+      }
+    }
+  }
+  list(ref = ref, jaccard = colMeans(J, na.rm = TRUE), coassign = co / pmax(seen, 1))
+}
+```
+
+## PCA and number of dimensions
+
+The number of dimensions is chosen by **Horn's parallel analysis**: keep a
+dimension only if its eigenvalue exceeds the 95th percentile of eigenvalues
+from data with the same variables but no correlation among them (each column
+permuted independently). Kaiser, cumulative variance and broken stick are shown
+for comparison.
+
+```{r pca}
+X <- dat[BEHAV]
+res.pca.full <- PCA(X, ncp = 10, graph = FALSE)
+# Eigenvalues of the correlation matrix (identical to FactoMineR's standardised PCA)
+eig <- pmax(eigen(cor(X), symmetric = TRUE, only.values = TRUE)$values, 0)
+p <- length(eig)
+
+pa <- apply(replicate(N_PA, eigen(cor(apply(X, 2, sample)), symmetric = TRUE,
+                                  only.values = TRUE)$values), 1, quantile, 0.95)
+bs <- sapply(1:p, function(k) sum(1 / (k:p)))
+
+pc_tab <- data.frame(dim = 1:p, eigenvalue = eig, pct_var = 100 * eig / sum(eig),
+                     cum_pct = 100 * cumsum(eig) / sum(eig), parallel_95 = pa, broken_stick = bs)
+round(head(pc_tab, 10), 3)
+
+rules <- c(`Parallel analysis (95%)` = which(eig <= pa)[1] - 1,
+           `Broken stick`            = which(eig <= bs)[1] - 1,
+           `Kaiser (eigenvalue > 1)` = sum(eig > 1),
+           `Cumulative >= 75%`       = which(pc_tab$cum_pct >= 75)[1])
+rules
+N_DIM <- if (is.null(N_DIM_OVERRIDE)) max(2, rules[["Parallel analysis (95%)"]]) else N_DIM_OVERRIDE
+cat("Dimensions retained: N_DIM =", N_DIM, "(", round(pc_tab$cum_pct[N_DIM], 1), "% of variance )\n")
+write.csv(pc_tab, file.path(OUT, "A_pca_dimensions.csv"), row.names = FALSE)
+```
+
+```{r pca-plot}
+g <- pc_tab %>% filter(dim <= 10) %>%
+  pivot_longer(c(eigenvalue, parallel_95, broken_stick)) %>%
+  mutate(name = recode(name, eigenvalue = "Observed", parallel_95 = "Parallel analysis (95%)",
+                       broken_stick = "Broken stick")) %>%
+  ggplot(aes(dim, value, colour = name, linetype = name)) + geom_line() + geom_point() +
+  geom_vline(xintercept = N_DIM + 0.5, colour = "grey50", linetype = 3) +
+  scale_x_continuous(breaks = 1:10) +
+  scale_colour_manual(values = c("black", "#d95f02", "#1b9e77")) +
+  labs(x = "Dimension", y = "Eigenvalue", colour = NULL, linetype = NULL) +
+  theme_bw() + theme(legend.position = "bottom")
+g
+ggsave(file.path(FIG, "A_pca_dimensions.pdf"), g, width = 7, height = 4.5)
+```
+
+### What the dimensions represent
+
+Correlations between variables and dimensions (unrotated; these are the axes
+used for clustering). Only the first two axes are usually stable enough to be
+interpreted one by one — describe strategies with the original variables
+(below) rather than by individual dimensions.
+
+```{r loadings}
+round(res.pca.full$var$cor[, 1:N_DIM], 2)
+fviz_pca_var(res.pca.full, repel = TRUE, col.var = "contrib",
+             gradient.cols = c("grey70", "#d95f02"))
+```
+
+## Number of strategies
+
+Candidate solutions k = `r min(K_RANGE)`–`r max(K_RANGE)` are compared with:
+
+* **Gap statistic** (Tibshirani et al. 2001, 1-SE rule): compares within-cluster
+  dispersion with that of structureless reference data.
+* **HCPC's own rule** (minimum within-inertia ratio), shown for information.
+* **Mean silhouette** and **minimum cluster size**.
+* **Bootstrap stability**: mean Jaccard similarity of each cluster across
+  `r N_BOOT` resamples of the whole pipeline.
+
+**Decision rule.** Take the k suggested by the gap statistic, provided every
+strategy has ≥ `MIN_CLUSTER_N` seals and a mean Jaccard ≥ `MIN_JACCARD`.
+Otherwise take the largest k below it that meets both conditions.
+
+```{r choose-k}
+S <- res.pca.full$ind$coord[, 1:N_DIM]
+
+gs <- clusGap(S, FUNcluster = function(x, k) list(cluster = hcpc_lite(x, k)),
+              K.max = max(K_RANGE), B = N_GAP, spaceH0 = "scaledPCA", verbose = FALSE)
+k_gap <- maxSE(gs$Tab[, "gap"], gs$Tab[, "SE.sim"], method = "Tibs2001SEmax")
+hr <- hcpc_ratio(S, K_RANGE)
+
+stab <- lapply(K_RANGE, function(k) { set.seed(SEED); boot_stability(X, N_DIM, k) })
+names(stab) <- K_RANGE
+
+k_tab <- data.frame(
+  k = K_RANGE,
+  gap = gs$Tab[K_RANGE, "gap"], gap_se = gs$Tab[K_RANGE, "SE.sim"],
+  hcpc_ratio = hr,
+  silhouette = sapply(K_RANGE, function(k) mean(silhouette(hcpc_lite(S, k), dist(S))[, 3])),
+  sizes = sapply(stab, function(s) paste(sort(table(s$ref), decreasing = TRUE), collapse = "/")),
+  min_size = sapply(stab, function(s) min(table(s$ref))),
+  min_jaccard = sapply(stab, function(s) min(s$jaccard)),
+  row.names = NULL)
+k_tab$passes <- k_tab$min_size >= MIN_CLUSTER_N & k_tab$min_jaccard >= MIN_JACCARD
+k_tab %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(k_tab, file.path(OUT, "A_number_of_strategies.csv"), row.names = FALSE)
+
+ok <- k_tab$k[k_tab$passes]
+K_SUGGESTED <- if (k_gap %in% ok) k_gap else if (any(ok < k_gap)) max(ok[ok < k_gap]) else min(K_RANGE)
+K <- if (is.null(K_OVERRIDE)) K_SUGGESTED else K_OVERRIDE
+cat("Gap statistic suggests k =", k_gap, "; HCPC rule suggests k =", names(which.min(hr)),
+    "; decision rule gives K =", K_SUGGESTED, "; using K =", K, "\n")
+```
+
+```{r choose-k-plot, fig.height = 6}
+kp <- k_tab %>% dplyr::select(k, gap, silhouette, min_jaccard) %>%
+  pivot_longer(-k) %>%
+  mutate(name = recode(name, gap = "Gap statistic", silhouette = "Mean silhouette",
+                       min_jaccard = "Least stable cluster (Jaccard)"))
+g <- ggplot(kp, aes(k, value)) + geom_line() + geom_point() +
+  geom_vline(xintercept = K, colour = "#d95f02", linetype = 2) +
+  geom_hline(data = data.frame(name = "Least stable cluster (Jaccard)", y = MIN_JACCARD),
+             aes(yintercept = y), linetype = 3) +
+  facet_wrap(~ name, ncol = 1, scales = "free_y") +
+  scale_x_continuous(breaks = K_RANGE) + theme_bw() + labs(x = "Number of strategies", y = NULL)
+g
+ggsave(file.path(FIG, "A_number_of_strategies.pdf"), g, width = 6, height = 7)
+```
+
+## Is there cluster structure at all?
+
+Clustering always returns groups, even from a continuum. Here the observed
+silhouette is compared with that obtained by applying the same clustering to
+`r N_NULL` data sets simulated from a single multivariate normal distribution
+with the observed variance on each retained dimension (no groups). A p-value
+near or above 0.05 means the strategies are weakly separated and should be
+described as modes of a continuum rather than discrete groups.
+
+```{r null-structure}
+sds <- apply(S, 2, sd)
+set.seed(SEED)
+null_struct <- do.call(rbind, lapply(intersect(2:4, K_RANGE), function(k) {
+  obs <- mean(silhouette(hcpc_lite(S, k), dist(S))[, 3])
+  sim <- replicate(N_NULL, {
+    Y <- sapply(sds, function(s) rnorm(nrow(S), 0, s))
+    mean(silhouette(hcpc_lite(Y, k), dist(Y))[, 3])
+  })
+  data.frame(k = k, silhouette = obs, null_median = median(sim),
+             null_95 = quantile(sim, 0.95), p = (1 + sum(sim >= obs)) / (N_NULL + 1))
+}))
+rownames(null_struct) <- NULL
+null_struct %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(null_struct, file.path(OUT, "A_null_structure_test.csv"), row.names = FALSE)
+```
+
+## Would one more strategy be justified? (K vs K + 1)
+
+When two solutions are close, the choice should rest on (i) whether the finer
+solution is a refinement of the coarser one, (ii) whether the extra group is
+reproducible, and (iii) whether it differs in variables that were **not** used
+to build the clusters (external validation; Hennig 2015, *Pattern Recognition
+Letters* 64:53–62).
+
+### 1. What the gap statistic says
+
+The 1-SE rule picks the *smallest* k whose gap is within one standard error of
+the next; it is deliberately conservative. Other standard rules are shown for
+comparison.
+
+```{r kplus1-gap}
+K_HI <- K + 1
+sapply(c("Tibs2001SEmax", "firstSEmax", "firstmax", "globalSEmax", "globalmax"),
+       function(m) maxSE(gs$Tab[, "gap"], gs$Tab[, "SE.sim"], method = m))
+k_tab %>% filter(k %in% (K - 1):(K + 2)) %>%
+  dplyr::select(k, gap, gap_se, silhouette, sizes, min_size, min_jaccard, passes) %>%
+  mutate(across(where(is.double), ~ round(.x, 3)))
+```
+
+### 2. Is K + 1 a refinement of K, and is the extra group stable?
+
+```{r kplus1-nesting}
+stopifnot(as.character(K_HI) %in% names(stab))
+l_lo <- stab[[as.character(K)]]$ref; l_hi <- stab[[as.character(K_HI)]]$ref
+table(`K` = l_lo, `K + 1` = l_hi)
+new_grp   <- as.integer(names(which.min(table(l_hi))))                  # smallest group at K + 1
+parent    <- as.integer(names(which.max(table(l_lo[l_hi == new_grp])))) # K cluster it comes from
+in_parent <- l_lo == parent
+split_grp <- l_hi == new_grp & in_parent
+cat("K + 1 =", K_HI, "separates", sum(split_grp), "seals from a cluster of", sum(in_parent),
+    "; Jaccard stability of that group:", round(stab[[as.character(K_HI)]]$jaccard[new_grp], 2), "\n")
+
+data.frame(scale(dat[BEHAV]))[in_parent, ] %>%
+  mutate(group = ifelse(split_grp[in_parent], "split-off group", "rest of parent")) %>%
+  group_by(group) %>% summarise(across(everything(), mean)) %>%
+  pivot_longer(-group, names_to = "variable") %>%
+  pivot_wider(names_from = group, values_from = value) %>%
+  mutate(difference_z = `split-off group` - `rest of parent`) %>%
+  arrange(desc(abs(difference_z))) %>% head(8) %>%
+  mutate(across(where(is.double), ~ round(.x, 2)))
+```
+
+### 3. External validation of the extra group
+
+Permutation test (difference in means, two-sided) between the split-off group
+and the rest of the cluster it comes from, on variables not used for clustering.
+
+```{r kplus1-external}
+perm_diff <- function(x, g, B = N_PERM) {
+  obs  <- mean(x[g]) - mean(x[!g])
+  null <- replicate(B, { s <- sample(g); mean(x[s]) - mean(x[!s]) })
+  c(n_split = sum(g), n_rest = sum(!g),
+    mean_split = mean(x[g]), mean_rest = mean(x[!g]),
+    difference = obs, p_perm = (1 + sum(abs(null) >= abs(obs))) / (B + 1))
+}
+ext_vars <- intersect(c("TripDuration_days", "MassGainRate_kgPerDay_Dcrocker", ISO), names(dat))
+set.seed(SEED)
+split_tests <- t(sapply(ext_vars, function(v) {
+  ok <- in_parent & !is.na(dat[[v]])
+  perm_diff(dat[[v]][ok], split_grp[ok])
+}))
+round(split_tests, 4)
+write.csv(split_tests, file.path(OUT, "A_K_vs_Kplus1_external_validation.csv"))
+```
+
+**Interpretation.** Keep K unless the extra group at K + 1 is nested, stable
+(Jaccard ≥ `MIN_JACCARD`) **and** differs in independent variables. If it fails
+these checks, the finer solution is splitting a continuum.
+
+## Final HCPC
+
+```{r hcpc}
+res.pca  <- PCA(X, ncp = N_DIM, graph = FALSE)
+res.hcpc <- HCPC(res.pca, nb.clust = K, consol = TRUE, graph = FALSE)
+cl <- as.integer(res.hcpc$data.clust$clust)
+ref_K <- stab[[as.character(K)]]$ref
+cat("Agreement with the bootstrap reference partition (ARI):",
+    round(mclust::adjustedRandIndex(cl, ref_K), 3), "\n")
+# Jaccard values re-indexed to the HCPC cluster numbers
+jac_cl <- stab[[as.character(K)]]$jaccard[
+  sapply(1:K, function(j) as.integer(names(which.max(table(ref_K[cl == j])))))]
+
+# Name each strategy by the mesoecoregion it uses most (relative to the population),
+# and order strategies by size. Edit the names after looking at the profiles if needed.
+zreg <- apply(scale(dat[names(REGIONS)]), 2, function(z) tapply(z, cl, mean))
+nm <- make.unique(unname(REGIONS[apply(zreg, 1, which.max)]), sep = " ")
+size_order <- order(table(cl), decreasing = TRUE)
+dat$strategy <- factor(nm[cl], levels = nm[size_order])
+COLS <- setNames(PAL[seq_len(K)], levels(dat$strategy))
+table(dat$strategy)
+
+# Per-seal assignment confidence
+dat$silhouette <- silhouette(cl, dist(S))[, 3]
+dat$coassign   <- stab[[as.character(K)]]$coassign
+data.frame(strategy = levels(dat$strategy),
+           n = as.vector(table(dat$strategy)),
+           jaccard = jac_cl[size_order],
+           median_coassign = tapply(dat$coassign, dat$strategy, median),
+           n_low_confidence = tapply(dat$coassign < LOW_CONFIDENCE, dat$strategy, sum)) %>%
+  mutate(across(where(is.double), ~ round(.x, 2)))
+dat %>% filter(coassign < LOW_CONFIDENCE | silhouette < 0) %>%
+  dplyr::select(TOPPID, ProcedureYear, strategy, silhouette, coassign)
+```
+
+### Dendrogram and factor map
+
+```{r hcpc-plots, fig.height = 6}
+fviz_dend(res.hcpc, cex = 0.5, palette = unname(PAL[seq_len(K)]), rect = TRUE,
+          rect_fill = TRUE, show_labels = FALSE, main = "Post-Moult females: HCPC")
+g <- data.frame(Dim1 = S[, 1], Dim2 = S[, 2], strategy = dat$strategy) %>%
+  ggplot(aes(Dim1, Dim2, colour = strategy)) +
+  geom_point(size = 2, alpha = 0.8) + stat_ellipse(level = 0.95, type = "norm") +
+  scale_colour_manual(values = COLS) + theme_bw() +
+  labs(x = sprintf("Dim 1 (%.1f%%)", pc_tab$pct_var[1]),
+       y = sprintf("Dim 2 (%.1f%%)", pc_tab$pct_var[2]), colour = "Strategy")
+g
+ggsave(file.path(FIG, "A_factor_map.pdf"), g, width = 7, height = 5)
+```
+
+### What characterises each strategy
+
+`v.test` > 2 (or < −2) means the strategy mean is significantly above (below)
+the population mean. These tests are **descriptive**: the same variables built
+the clusters.
+
+```{r profiles, fig.width = 10, fig.height = 4}
+desc <- res.hcpc$desc.var$quanti
+names(desc) <- nm[as.integer(names(desc))]
+lapply(desc, function(d)
+  if (is.null(d)) "no variable differs from the population mean" else
+    round(d[, c("v.test", "Mean in category", "Overall mean"), drop = FALSE], 2))
+
+prof <- data.frame(scale(dat[BEHAV]), strategy = dat$strategy) %>%
+  pivot_longer(-strategy, names_to = "variable") %>%
+  group_by(strategy, variable) %>% summarise(mean_z = mean(value), .groups = "drop") %>%
+  mutate(block = ifelse(variable %in% SPACE, "Movement / habitat", "Diving"),
+         variable = factor(variable, BEHAV))
+g <- ggplot(prof, aes(variable, strategy, fill = mean_z)) + geom_tile() +
+  facet_grid(~ block, scales = "free_x", space = "free_x") +
+  scale_fill_gradient2(low = "#2166ac", high = "#b2182b") + theme_bw() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  labs(x = NULL, y = NULL, fill = "Mean z")
+g
+ggsave(file.path(FIG, "A_strategy_profiles.pdf"), g, width = 11, height = 4.5)
+
+# Mean (SD) of each variable by strategy
+dat %>% group_by(strategy) %>%
+  summarise(across(all_of(BEHAV), ~ sprintf("%.2f (%.2f)", mean(.x), sd(.x)))) %>%
+  pivot_longer(-strategy, names_to = "variable") %>%
+  pivot_wider(names_from = strategy, values_from = value)
+```
+
+## Sensitivity of the strategies
+
+Each alternative is compared with the final partition with the adjusted Rand
+index (ARI = 1: identical; > 0.8: very similar).
+
+```{r sensitivity}
+ari <- function(a, b) round(mclust::adjustedRandIndex(a, b), 3)
+sens <- list()
+
+for (nd in setdiff(c(N_DIM - 1, N_DIM + 1, length(BEHAV)), 1))
+  sens[[paste("Dimensions =", nd)]] <- ari(cl, hcpc_lite(pc_scores(X, nd), K))
+
+mfa <- MFA(X, group = c(length(SPACE), length(DIVE)), type = c("s", "s"),
+           name.group = c("Space", "Diving"), ncp = N_DIM, graph = FALSE)
+sens[["MFA (blocks weighted equally)"]] <- ari(cl, hcpc_lite(mfa$ind$coord[, 1:N_DIM], K))
+
+sk <- names(which(abs(sapply(X, skew)) > SKEW_THRESHOLD & sapply(X, min) >= 0))
+Xlog <- X; Xlog[sk] <- lapply(X[sk], function(x) log(x + max(min(x[x > 0]) / 2, 1e-6)))
+sens[["Log-transform skewed variables"]] <- ari(cl, hcpc_lite(pc_scores(Xlog, N_DIM), K))
+
+Xred <- X[setdiff(BEHAV, c("SdDistContShelf_km", "MesoEcoProportionNorthCPac"))]
+sens[["Drop redundant SdDist + NorthCPac"]] <- ari(cl, hcpc_lite(pc_scores(Xred, N_DIM), K))
+
+sens[["Ward without consolidation"]] <- ari(cl, cutree(hclust(dist(S), "ward.D2"), K))
+set.seed(SEED)
+sens[["k-means (100 starts)"]] <- ari(cl, kmeans(S, K, nstart = 100)$cluster)
+
+md2 <- mahalanobis(S, colMeans(S), cov(S))
+out <- md2 > qchisq(0.999, N_DIM)
+cat("Multivariate outliers (p < 0.001):", paste(dat$TOPPID[out], collapse = ", "), "\n")
+if (any(out)) sens[["Without multivariate outliers"]] <-
+  ari(cl[!out], hcpc_lite(pc_scores(X[!out, ], N_DIM), K))
+
+one <- !duplicated(ifelse(is.na(dat$MainID), dat$TOPPID, dat$MainID))
+sens[["One trip per seal"]] <- ari(cl[one], hcpc_lite(pc_scores(X[one, ], N_DIM), K))
+
+sens_tab <- data.frame(scenario = names(sens), ARI = unlist(sens), row.names = NULL)
+sens_tab
+write.csv(sens_tab, file.path(OUT, "A_sensitivity.csv"), row.names = FALSE)
+
+write.csv(dat %>% dplyr::select(TOPPID, MainID, ProcedureYear, strategy, silhouette, coassign),
+          file.path(OUT, "A_strategy_assignments.csv"), row.names = FALSE)
+```
+
+## Strategies and year
+
+```{r year}
+table(dat$strategy, dat$ProcedureYear)
+fisher.test(table(dat$strategy, dat$ProcedureYear), simulate.p.value = TRUE, B = 1e4)
+```
+
+## Comparison with the Post-Breeding strategies
+
+For seals tracked on both trips, is the Post-Moult strategy related to the
+Post-Breeding one? Run `NESE_PB_ForagingStrategies.Rmd` first. Only a subset of
+seals have both trips, so treat this as exploratory. The PB and PM trips
+compared here need not be from the same year.
+
+```{r pb-pm}
+if (file.exists(PB_ASSIGNMENTS)) {
+  pb <- read.csv(PB_ASSIGNMENTS) %>%
+    mutate(MainID = as.character(MainID)) %>% filter(!is.na(MainID)) %>%
+    arrange(ProcedureYear) %>% distinct(MainID, .keep_all = TRUE) %>%
+    dplyr::select(MainID, PB_year = ProcedureYear, PB_strategy = strategy)
+  both <- dat %>% filter(!is.na(MainID)) %>%
+    dplyr::select(MainID, PM_year = ProcedureYear, PM_strategy = strategy) %>%
+    inner_join(pb, by = "MainID")
+  cat(n_distinct(both$MainID), "seals with both a PB and a PM trip\n")
+  print(both)
+  tab <- table(PB = both$PB_strategy, PM = both$PM_strategy)
+  print(tab)
+  if (nrow(both) >= 5 && all(dim(tab) > 1))
+    print(fisher.test(tab, simulate.p.value = TRUE, B = 1e4))
+} else {
+  message("PB assignments not found at ", PB_ASSIGNMENTS, ": run the PB script first.")
+}
+```
+
+# Part B — Isotopic niches of the strategies
+
+Isotopes were not used to define the strategies, so differences here are an
+independent result. State which tissue was sampled and the period it integrates
+relative to the tracked trip. Isotopic baselines vary among years, so year is
+included as a covariate in the tests and checked in the sensitivity analysis.
+
+## Helper functions
+
+```{r helpers-B}
+# Freedman-Lane permutation F test for `term`, adjusting for `covars`
+fl_test <- function(d, response, term = "strategy", covars = character(0), B = N_PERM) {
+  v  <- c(response, term, covars)
+  d  <- d[complete.cases(d[v]), v, drop = FALSE]
+  X0 <- model.matrix(reformulate(if (length(covars)) covars else "1"), d)
+  X1 <- model.matrix(reformulate(c(covars, term)), d)
+  y  <- d[[response]]
+  Fstat <- function(y) {
+    m0 <- lm.fit(X0, y); m1 <- lm.fit(X1, y)
+    r0 <- sum(m0$residuals^2); r1 <- sum(m1$residuals^2)
+    ((r0 - r1) / (m1$rank - m0$rank)) / (r1 / (nrow(X1) - m1$rank))
+  }
+  F_obs <- Fstat(y)
+  m0 <- lm.fit(X0, y); fit0 <- y - m0$residuals
+  F_p <- replicate(B, Fstat(fit0 + sample(m0$residuals)))
+  data.frame(response = response,
+             covariates = if (length(covars)) paste(covars, collapse = " + ") else "none",
+             n = nrow(d), F = F_obs, p_perm = (1 + sum(F_p >= F_obs)) / (B + 1))
+}
+
+# All pairwise differences between strategies from an lm, with CIs
+pair_contrasts <- function(fit, term = "strategy", level = 0.95) {
+  b <- coef(fit); V <- vcov(fit)
+  lev <- levels(model.frame(fit)[[term]]); cn <- paste0(term, lev)
+  tq <- qt(1 - (1 - level) / 2, fit$df.residual)
+  do.call(rbind, combn(seq_along(lev), 2, simplify = FALSE, FUN = function(ij) {
+    L <- setNames(numeric(length(b)), names(b))
+    if (cn[ij[2]] %in% names(b)) L[cn[ij[2]]] <- 1
+    if (cn[ij[1]] %in% names(b)) L[cn[ij[1]]] <- L[cn[ij[1]]] - 1
+    est <- sum(L * b); se <- sqrt(drop(t(L) %*% V %*% L))
+    data.frame(contrast = paste(lev[ij[2]], "-", lev[ij[1]]),
+               estimate = est, lwr = est - tq * se, upr = est + tq * se)
+  }))
+}
+
+# Bayesian niche summaries (nicheROVER, default non-informative prior)
+iso_niche <- function(d, nsamples = N_POST, seed = SEED) {
+  set.seed(seed)
+  par <- tapply(seq_len(nrow(d)), droplevels(d$strategy),
+                function(ii) niw.post(nsamples = nsamples, X = as.matrix(d[ii, ISO])))
+  nr95 <- sapply(par, function(sp) apply(sp$Sigma, 3, niche.size, alpha = 0.95))
+  seab <- sapply(par, function(sp) apply(sp$Sigma, 3, function(Sg) pi * sqrt(det(Sg))))
+  set.seed(seed)
+  ov <- overlap(par, nreps = nsamples, nprob = nsamples, alpha = c(0.95, 0.99))
+  list(par = par, nr95 = nr95, seab = seab, overlap = ov)
+}
+```
+
+## Isotopic values by strategy
+
+```{r iso-describe}
+dat %>% group_by(strategy) %>%
+  summarise(n = n(),
+            d13C = sprintf("%.2f ± %.2f", mean(d13C), sd(d13C)),
+            d15N = sprintf("%.2f ± %.2f", mean(d15N), sd(d15N)))
+
+g <- ggplot(dat, aes(d13C, d15N, colour = strategy)) +
+  geom_point(size = 2, alpha = 0.8) +
+  stat_ellipse(level = 0.40, type = "norm", linewidth = 0.9) +   # ~ standard ellipse
+  scale_colour_manual(values = COLS) + theme_bw() +
+  labs(x = expression(delta^{13}*C~"(‰)"), y = expression(delta^{15}*N~"(‰)"),
+       colour = "Strategy", caption = "Ellipses: 40% (standard ellipse)")
+g
+ggsave(file.path(FIG, "B_isotopes_by_strategy.pdf"), g, width = 7, height = 5, device = cairo_pdf)
+```
+
+## Do strategies differ in isotopic values?
+
+```{r iso-tests}
+set.seed(SEED)
+iso_tests <- bind_rows(lapply(ISO, function(v) bind_rows(
+  fl_test(dat, v), fl_test(dat, v, covars = "ProcedureYear"))))
+iso_tests$p_BH <- p.adjust(iso_tests$p_perm, "BH")
+iso_tests %>% mutate(across(c(F, p_perm, p_BH), ~ signif(.x, 3)))
+
+fits <- lapply(setNames(ISO, ISO), function(v)
+  lm(reformulate(c("strategy", "ProcedureYear"), v), data = dat))
+contr <- bind_rows(lapply(fits, pair_contrasts), .id = "isotope")
+contr %>% mutate(across(where(is.numeric), ~ round(.x, 3)))
+write.csv(bind_rows(iso_tests), file.path(OUT, "B_isotope_tests.csv"), row.names = FALSE)
+write.csv(contr, file.path(OUT, "B_isotope_contrasts.csv"), row.names = FALSE)
+```
+
+### Isotopic differences with K - 1, K and K + 1 strategies
+
+```{r iso-k-compare}
+set.seed(SEED)
+bind_rows(lapply(intersect(c(K - 1, K, K + 1), K_RANGE), function(k) {
+  d <- dat; d$strategy <- factor(stab[[as.character(k)]]$ref)
+  bind_rows(lapply(ISO, function(v) fl_test(d, v, covars = "ProcedureYear"))) %>% mutate(k = k)
+})) %>% dplyr::select(k, response, n, F, p_perm) %>% mutate(across(c(F, p_perm), ~ signif(.x, 3)))
+```
+
+### Equivalence: are some strategies isotopically indistinguishable?
+
+A non-significant test is not evidence of no difference. Two one-sided tests
+(TOST): two strategies are considered equivalent if the 90 % CI of their
+difference lies inside ±margin (`EQUIV`).
+
+```{r iso-equivalence}
+tost <- bind_rows(lapply(ISO, function(v) {
+  ci <- pair_contrasts(fits[[v]], level = 0.90)
+  data.frame(isotope = v, ci, margin = EQUIV[[v]],
+             equivalent = ci$lwr > -EQUIV[[v]] & ci$upr < EQUIV[[v]],
+             different  = ci$lwr > 0 | ci$upr < 0)
+}))
+tost %>% mutate(across(where(is.numeric), ~ round(.x, 3)))
+```
+
+## Isotopic niche size and overlap (nicheROVER)
+
+nicheROVER is used with its **default, non-informative prior** and a fixed
+seed. Niche size is reported as the 95 % niche region (nicheROVER) and as the
+Bayesian standard ellipse area (SEA_B = π√|Σ|, comparable with SIBER); SEAc is
+the small-sample-corrected standard ellipse area from the data.
+
+```{r iso-niche}
+nb <- iso_niche(dat)
+
+sea_c <- tapply(seq_len(n), dat$strategy, function(ii) {
+  m <- length(ii); pi * sqrt(det(cov(dat[ii, ISO]))) * (m - 1) / (m - 2) })
+size_tab <- data.frame(strategy = levels(dat$strategy), n = as.vector(table(dat$strategy)),
+  SEAc = as.vector(sea_c),
+  SEAb_median = apply(nb$seab, 2, median),
+  SEAb_lwr = apply(nb$seab, 2, quantile, 0.025), SEAb_upr = apply(nb$seab, 2, quantile, 0.975),
+  NR95_median = apply(nb$nr95, 2, median),
+  NR95_lwr = apply(nb$nr95, 2, quantile, 0.025), NR95_upr = apply(nb$nr95, 2, quantile, 0.975))
+size_tab %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(size_tab, file.path(OUT, "B_niche_size.csv"), row.names = FALSE)
+
+# Posterior probability that the row strategy has a larger niche than the column strategy
+lev <- levels(dat$strategy)
+round(outer(lev, lev, Vectorize(function(a, b) mean(nb$seab[, a] > nb$seab[, b]))), 3) %>%
+  `dimnames<-`(list(lev, lev))
+```
+
+```{r iso-size-plot}
+g <- as.data.frame(nb$seab) %>% pivot_longer(everything(), names_to = "strategy") %>%
+  mutate(strategy = factor(strategy, lev)) %>%
+  ggplot(aes(strategy, value, fill = strategy)) +
+  geom_violin(alpha = 0.6, colour = NA) +
+  stat_summary(fun.data = function(x) data.frame(y = median(x), ymin = quantile(x, .025),
+                                                 ymax = quantile(x, .975))) +
+  geom_point(data = size_tab, aes(strategy, SEAc), shape = 4, size = 3, inherit.aes = FALSE) +
+  scale_fill_manual(values = COLS, guide = "none") + theme_bw() +
+  labs(x = NULL, y = expression("SEA"[B]~"(‰"^2*")"),
+       caption = "Median and 95% credible interval; x = SEAc")
+g
+ggsave(file.path(FIG, "B_niche_size.pdf"), g, width = 6, height = 4.5, device = cairo_pdf)
+```
+
+**Overlap.** Entry [row, column] is the probability (%) that an individual of
+the row strategy falls inside the 95 % niche region of the column strategy.
+Overlap is directional, so the two directions can differ.
+
+```{r iso-overlap}
+ov_mean <- apply(nb$overlap, c(1:2, 4), mean) * 100
+ov_ci   <- apply(nb$overlap * 100, c(1:2, 4), quantile, prob = c(0.025, 0.975), na.rm = TRUE)
+round(ov_mean[, , 1], 1)
+round(ov_ci[, , , 1], 1)
+ov_long <- expand.grid(from = lev, into = lev, stringsAsFactors = FALSE) %>% filter(from != into) %>%
+  mutate(mean = mapply(function(a, b) ov_mean[a, b, 1], from, into),
+         lwr  = mapply(function(a, b) ov_ci[1, a, b, 1], from, into),
+         upr  = mapply(function(a, b) ov_ci[2, a, b, 1], from, into))
+write.csv(ov_long, file.path(OUT, "B_niche_overlap_95.csv"), row.names = FALSE)
+```
+
+```{r iso-niche-plots, fig.height = 6}
+set.seed(SEED)
+par50 <- tapply(seq_len(n), dat$strategy,
+                function(ii) niw.post(nsamples = 50, X = as.matrix(dat[ii, ISO])))
+dat_l <- tapply(seq_len(n), dat$strategy, function(ii) as.matrix(dat[ii, ISO]))
+niche.plot(niche.par = par50, niche.data = dat_l, pfrac = 0.05,
+           iso.names = expression(delta^{13}*C, delta^{15}*N), col = unname(COLS))
+overlap.plot(nb$overlap[, , , 1], col = unname(COLS), mean.cred.col = "turquoise",
+             equal.axis = TRUE, xlab = "Overlap probability (%) - 95% niche region")
+```
+
+## Isotopic niche size and overlap (SIBER)
+
+SIBER (Jackson et al. 2011) gives the standard measures of isotopic niche
+width: the sample-size-corrected standard ellipse area (SEAc) and its Bayesian
+estimate (SEA_B, fitted in JAGS). Overlap is the **area** shared by two
+ellipses (here the `r SIBER_P * 100` % ellipses), expressed as a proportion of
+the combined area (symmetric) and of each ellipse (directional). Unlike
+nicheROVER's probabilistic overlap, it is purely geometric, so the two are not
+directly comparable. This section is skipped if JAGS is not installed.
+
+```{r siber-fit, eval = HAS_SIBER}
+# SIBER needs columns iso1, iso2, group, community; simple group codes avoid
+# problems with spaces in names (lookup table below)
+codes <- setNames(paste0("S", seq_along(lev)), lev)
+siber_df <- data.frame(iso1 = dat$d13C, iso2 = dat$d15N,
+                       group = unname(codes[as.character(dat$strategy)]), community = 1)
+siber <- SIBER::createSiberObject(siber_df)
+ell_id <- paste0("1.", codes)                 # ellipse identifiers: "community.group"
+names(ell_id) <- lev
+data.frame(strategy = lev, code = codes, ellipse = ell_id, row.names = NULL)
+
+# Maximum-likelihood metrics (TA = convex hull area, SEA, SEAc)
+ml <- SIBER::groupMetricsML(siber)
+colnames(ml) <- lev[match(colnames(ml), ell_id)]
+round(ml, 3)
+
+# Bayesian standard ellipses
+set.seed(SEED)
+ell_post <- SIBER::siberMVN(siber, SIBER_PARMS, SIBER_PRIORS)
+sea_b_siber <- SIBER::siberEllipses(ell_post)
+colnames(sea_b_siber) <- lev[match(names(ell_post), ell_id)]
+
+siber_size <- data.frame(strategy = colnames(sea_b_siber),
+  n = as.vector(table(dat$strategy)[colnames(sea_b_siber)]),
+  SEAc = ml["SEAc", colnames(sea_b_siber)],
+  SEAb_mode = apply(sea_b_siber, 2, function(x) { dd <- density(x); dd$x[which.max(dd$y)] }),
+  SEAb_median = apply(sea_b_siber, 2, median),
+  SEAb_lwr = apply(sea_b_siber, 2, quantile, 0.025),
+  SEAb_upr = apply(sea_b_siber, 2, quantile, 0.975), row.names = NULL)
+siber_size %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(siber_size, file.path(OUT, "B_SIBER_niche_size.csv"), row.names = FALSE)
+
+# Posterior probability that the row strategy has a larger SEA_B than the column strategy
+round(outer(colnames(sea_b_siber), colnames(sea_b_siber),
+            Vectorize(function(a, b) mean(sea_b_siber[, a] > sea_b_siber[, b]))), 3) %>%
+  `dimnames<-`(list(colnames(sea_b_siber), colnames(sea_b_siber)))
+```
+
+```{r siber-plots, eval = HAS_SIBER, fig.height = 5}
+par(mfrow = c(1, 2), mar = c(4.5, 4.5, 1, 1))
+SIBER::plotSiberObject(siber, ax.pad = 0.5, hulls = FALSE, ellipses = TRUE,
+                       group.ellipses.args = list(lty = 1, lwd = 2, p.interval = SIBER_P),
+                       group.hulls = FALSE, bty = "L", iso.order = c(1, 2),
+                       xlab = expression(delta^{13}*C~"(‰)"),
+                       ylab = expression(delta^{15}*N~"(‰)"))
+legend("topleft", legend = paste(codes, names(codes)), bty = "n", cex = 0.7)
+SIBER::siberDensityPlot(sea_b_siber, xticklabels = codes[colnames(sea_b_siber)],
+                        xlab = "Strategy", ylab = expression("SEA"[B]~"(‰"^2*")"))
+points(seq_len(ncol(sea_b_siber)), siber_size$SEAc, col = "red", pch = 4, lwd = 2)
+par(mfrow = c(1, 1))
+```
+
+```{r siber-overlap, eval = HAS_SIBER}
+pairs_s <- combn(lev, 2, simplify = FALSE)
+
+# Maximum-likelihood overlap of the ellipses
+ml_ov <- do.call(rbind, lapply(pairs_s, function(pr) {
+  o <- SIBER::maxLikOverlap(ell_id[pr[1]], ell_id[pr[2]], siber, p.interval = SIBER_P, n = 100)
+  data.frame(A = pr[1], B = pr[2], area_A = o[["area.1"]], area_B = o[["area.2"]],
+             overlap_area = o[["overlap"]])
+}))
+
+# Bayesian overlap: one value per posterior draw
+set.seed(SEED)
+bayes_ov <- lapply(pairs_s, function(pr)
+  SIBER::bayesianOverlap(ell_id[pr[1]], ell_id[pr[2]], ell_post,
+                         draws = SIBER_DRAWS, p.interval = SIBER_P, n = 100))
+names(bayes_ov) <- sapply(pairs_s, paste, collapse = " vs ")
+
+q3 <- function(x) sprintf("%.2f (%.2f-%.2f)", median(x, na.rm = TRUE),
+                          quantile(x, 0.025, na.rm = TRUE), quantile(x, 0.975, na.rm = TRUE))
+siber_ov <- do.call(rbind, lapply(seq_along(pairs_s), function(i) {
+  b <- bayes_ov[[i]]; pr <- pairs_s[[i]]
+  ml_i <- ml_ov[i, ]
+  data.frame(
+    A = pr[1], B = pr[2],
+    ML_prop_of_union = ml_i$overlap_area / (ml_i$area_A + ml_i$area_B - ml_i$overlap_area),
+    Bayes_prop_of_union = q3(b$overlap / (b$area1 + b$area2 - b$overlap)),
+    Bayes_prop_of_A = q3(b$overlap / b$area1),     # share of A's ellipse inside B's
+    Bayes_prop_of_B = q3(b$overlap / b$area2))     # share of B's ellipse inside A's
+}))
+siber_ov %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(siber_ov, file.path(OUT, "B_SIBER_overlap.csv"), row.names = FALSE)
+```
+
+```{r siber-overlap-plot, eval = HAS_SIBER, fig.height = 4}
+g <- bind_rows(lapply(names(bayes_ov), function(nm) {
+  b <- bayes_ov[[nm]]
+  data.frame(pair = nm, prop = b$overlap / (b$area1 + b$area2 - b$overlap))
+})) %>%
+  ggplot(aes(pair, prop)) + geom_violin(fill = "grey80", colour = NA) +
+  stat_summary(fun.data = function(x) data.frame(y = median(x), ymin = quantile(x, .025),
+                                                 ymax = quantile(x, .975))) +
+  coord_cartesian(ylim = c(0, 1)) + theme_bw() +
+  labs(x = NULL, y = "Overlap (proportion of combined ellipse area)",
+       caption = paste0(SIBER_P * 100, "% ellipses; median and 95% credible interval"))
+g
+ggsave(file.path(FIG, "B_SIBER_overlap.pdf"), g, width = 7, height = 4)
+```
+
+**Reading the two approaches together.** Use SEAc / SEA_B (SIBER) to report
+niche width, and nicheROVER's directional probabilities as the main overlap
+result, with SIBER's area overlap as a check. They should agree on which pairs
+overlap most, even though the values differ. With only a handful of seals in
+the smallest strategy, its ellipse and every overlap involving it are
+uncertain; report the credible intervals.
+
+## Sensitivity of the isotopic results
+
+* **One trip per seal** — removes repeated individuals.
+* **High-confidence seals only** — bootstrap co-assignment ≥ `LOW_CONFIDENCE`.
+* **Year-centred isotopes** — removes year-to-year baseline shifts. Note that
+  this also removes any real difference between strategies that happen to be
+  concentrated in particular years.
+
+```{r iso-sensitivity}
+iso_c <- dat %>% group_by(ProcedureYear) %>%
+  mutate(across(all_of(ISO), ~ .x - mean(.x))) %>% ungroup() %>% as.data.frame()
+subsets <- list(`All trips` = dat,
+                `One trip per seal` = dat[one, ],
+                `High-confidence seals` = dat[dat$coassign >= LOW_CONFIDENCE, ],
+                `Year-centred isotopes` = iso_c)
+
+summ_subset <- function(d, nsamples = 5000) {
+  d$strategy <- droplevels(d$strategy)
+  if (min(table(d$strategy)) < 4) return(NULL)
+  nbx <- iso_niche(d, nsamples)
+  ov  <- apply(nbx$overlap, c(1:2, 4), mean)[, , 1] * 100
+  set.seed(SEED)
+  tests <- sapply(ISO, function(v) fl_test(d, v, covars = "ProcedureYear", B = 1999)$p_perm)
+  list(n = table(d$strategy),
+       SEAb_median = round(apply(nbx$seab, 2, median), 3),
+       overlap95 = round(ov, 1),
+       p_strategy_given_year = signif(tests, 3))
+}
+sens_iso <- lapply(subsets, summ_subset)
+sens_iso
+```
+
+# Summary
+
+```{r summary}
+list(
+  dimensions = c(N_DIM = N_DIM, pct_variance = round(pc_tab$cum_pct[N_DIM], 1)),
+  strategies = table(dat$strategy),
+  stability_jaccard = round(setNames(jac_cl[size_order], lev), 2),
+  sensitivity_ARI = sens_tab,
+  isotope_tests = iso_tests %>% dplyr::select(response, covariates, p_perm, p_BH),
+  isotope_equivalence = tost %>% dplyr::select(isotope, contrast, estimate, equivalent, different),
+  niche_size = size_tab %>% dplyr::select(strategy, n, SEAc, SEAb_median),
+  overlap_95 = round(ov_mean[, , 1], 1),
+  SIBER_size = if (exists("siber_size")) siber_size else "SIBER not run",
+  SIBER_overlap = if (exists("siber_ov")) siber_ov else "SIBER not run")
+saveRDS(dat, file.path(OUT, "PM_strategies.rds"))
+sessionInfo()
+```
+
+# Suggested Methods text (update numbers from the output)
+
+*Foraging strategies of post-moult females were identified with the same
+procedure as for the post-breeding trip, from 19 movement, habitat-use and
+diving variables summarising each trip (one trip with an impossible value of
+the proportion of time diving was excluded). Variables were standardised and
+summarised by principal component analysis; the number of components was
+chosen by Horn's parallel analysis (1,000 permutations, 95th percentile).
+Individuals were clustered on the retained components by Ward's hierarchical
+clustering followed by k-means consolidation (HCPC; FactoMineR). Candidate
+solutions (k = 2–8) were evaluated with the gap statistic (Tibshirani et al.
+2001; 1-SE rule), mean silhouette width, minimum cluster size (≥ 5) and
+stability under a whole-pipeline bootstrap (500 resamples; mean Jaccard ≥ 0.75,
+Hennig 2007), and the strength of cluster structure was tested against data
+simulated from a single multivariate normal distribution. [Report K, the
+silhouette null-model p-value, and why K + 1 was rejected.] Robustness was assessed by
+comparing partitions (adjusted Rand index) obtained with ±1 component,
+multiple factor analysis weighting spatial and diving variables equally,
+log-transformation of skewed variables, removal of redundant variables and of
+multivariate outliers, alternative clustering algorithms, and one trip per
+individual. Stable isotope values (δ¹³C, δ¹⁵N) were not used to define
+strategies and were analysed independently: differences among strategies were
+tested with Freedman–Lane permutation tests including year as a covariate,
+equivalence was assessed with two one-sided tests. Isotopic niche width was
+estimated as the sample-size-corrected standard ellipse area (SEAc) and its
+Bayesian estimate (SEA_B; SIBER, Jackson et al. 2011; 2 chains of 20,000
+iterations, burn-in 1,000, thinning 10, default priors). Niche overlap was
+estimated as the directional probability that an individual of one strategy
+falls within the 95 % niche region of another (nicheROVER, default
+non-informative prior; Swanson et al. 2015), and, as a check, as the area
+shared by the Bayesian 95 % ellipses relative to their combined area (SIBER).*
