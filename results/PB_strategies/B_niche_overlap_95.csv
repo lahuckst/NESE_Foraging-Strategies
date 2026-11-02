@@ -1,3 +1,7 @@
 "from","into","mean","lwr","upr"
-"North Central Pacific","Subarctic",92.126343,81.96975,98.4
-"Subarctic","North Central Pacific",71.216039,57.2495,84.47
+"North Central Pacific","Subarctic",90.690141,79.1895,97.96025
+"California Current","Subarctic",44.844792,14.4,78.1905
+"Subarctic","North Central Pacific",79.495595,65.4495,91.22025
+"California Current","North Central Pacific",22.558408,3.68975,51.84125
+"Subarctic","California Current",41.24687,9.21975,84.57125
+"North Central Pacific","California Current",37.536356,3.28,84.03075

@@ -2,10 +2,10 @@
 "Dimensions = 3",1
 "Dimensions = 5",1
 "Dimensions = 19",1
-"MFA (blocks weighted equally)",1
-"Log-transform skewed variables",1
-"Drop redundant SdDist + NorthCPac",0.794
-"Ward without consolidation",0.794
+"MFA (blocks weighted equally)",0.975
+"Log-transform skewed variables",0.934
+"Drop redundant SdDist + NorthCPac",0.959
+"Ward without consolidation",0.77
 "k-means (100 starts)",1
-"Without multivariate outliers",1
+"Without multivariate outliers",0.958
 "One trip per seal",1
