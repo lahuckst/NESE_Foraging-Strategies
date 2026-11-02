@@ -72,6 +72,14 @@ SKEW_THRESHOLD  <- 1      # |skewness| above which variables are log-transformed
 N_PERM          <- 4999   # permutations for Freedman-Lane tests
 N_POST          <- 1e4    # nicheROVER posterior draws
 LOW_CONFIDENCE  <- 0.80   # seals with bootstrap co-assignment below this are "low confidence"
+
+# SIBER (needs JAGS installed: https://mcmc-jags.sourceforge.io, then install.packages(c("rjags", "SIBER")))
+SIBER_PARMS  <- list(n.iter = 2e4, n.burnin = 1e3, n.thin = 10, n.chains = 2)
+SIBER_PRIORS <- list(R = 1 * diag(2), k = 2, tau.mu = 1.0E-3)   # SIBER defaults
+SIBER_DRAWS  <- 500      # posterior draws used for Bayesian ellipse overlap
+SIBER_P      <- 0.95     # ellipse used for overlap (0.95 = 95% ellipse; NULL = standard ellipse)
+HAS_SIBER <- requireNamespace("SIBER", quietly = TRUE) && requireNamespace("rjags", quietly = TRUE)
+if (!HAS_SIBER) message("SIBER/rjags (JAGS) not available: the SIBER section will be skipped.")
 # Equivalence margins (permil): differences smaller than these are considered
 # ecologically negligible. Biological judgement - justify in the paper.
 EQUIV <- c(d13C = 0.3, d15N = 0.5)
@@ -726,6 +734,123 @@ overlap.plot(nb$overlap[, , , 1], col = unname(COLS), mean.cred.col = "turquoise
              equal.axis = TRUE, xlab = "Overlap probability (%) - 95% niche region")
 ```
 
+## Isotopic niche size and overlap (SIBER)
+
+SIBER (Jackson et al. 2011) gives the standard measures of isotopic niche
+width: the sample-size-corrected standard ellipse area (SEAc) and its Bayesian
+estimate (SEA_B, fitted in JAGS). Overlap is the **area** shared by two
+ellipses (here the `r SIBER_P * 100` % ellipses), expressed as a proportion of
+the combined area (symmetric) and of each ellipse (directional). Unlike
+nicheROVER's probabilistic overlap, it is purely geometric, so the two are not
+directly comparable. This section is skipped if JAGS is not installed.
+
+```{r siber-fit, eval = HAS_SIBER}
+# SIBER needs columns iso1, iso2, group, community; simple group codes avoid
+# problems with spaces in names (lookup table below)
+codes <- setNames(paste0("S", seq_along(lev)), lev)
+siber_df <- data.frame(iso1 = dat$d13C, iso2 = dat$d15N,
+                       group = unname(codes[as.character(dat$strategy)]), community = 1)
+siber <- SIBER::createSiberObject(siber_df)
+ell_id <- paste0("1.", codes)                 # ellipse identifiers: "community.group"
+names(ell_id) <- lev
+data.frame(strategy = lev, code = codes, ellipse = ell_id, row.names = NULL)
+
+# Maximum-likelihood metrics (TA = convex hull area, SEA, SEAc)
+ml <- SIBER::groupMetricsML(siber)
+colnames(ml) <- lev[match(colnames(ml), ell_id)]
+round(ml, 3)
+
+# Bayesian standard ellipses
+set.seed(SEED)
+ell_post <- SIBER::siberMVN(siber, SIBER_PARMS, SIBER_PRIORS)
+sea_b_siber <- SIBER::siberEllipses(ell_post)
+colnames(sea_b_siber) <- lev[match(names(ell_post), ell_id)]
+
+siber_size <- data.frame(strategy = colnames(sea_b_siber),
+  n = as.vector(table(dat$strategy)[colnames(sea_b_siber)]),
+  SEAc = ml["SEAc", colnames(sea_b_siber)],
+  SEAb_mode = apply(sea_b_siber, 2, function(x) { dd <- density(x); dd$x[which.max(dd$y)] }),
+  SEAb_median = apply(sea_b_siber, 2, median),
+  SEAb_lwr = apply(sea_b_siber, 2, quantile, 0.025),
+  SEAb_upr = apply(sea_b_siber, 2, quantile, 0.975), row.names = NULL)
+siber_size %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(siber_size, file.path(OUT, "B_SIBER_niche_size.csv"), row.names = FALSE)
+
+# Posterior probability that the row strategy has a larger SEA_B than the column strategy
+round(outer(colnames(sea_b_siber), colnames(sea_b_siber),
+            Vectorize(function(a, b) mean(sea_b_siber[, a] > sea_b_siber[, b]))), 3) %>%
+  `dimnames<-`(list(colnames(sea_b_siber), colnames(sea_b_siber)))
+```
+
+```{r siber-plots, eval = HAS_SIBER, fig.height = 5}
+par(mfrow = c(1, 2), mar = c(4.5, 4.5, 1, 1))
+SIBER::plotSiberObject(siber, ax.pad = 0.5, hulls = FALSE, ellipses = TRUE,
+                       group.ellipses.args = list(lty = 1, lwd = 2, p.interval = SIBER_P),
+                       group.hulls = FALSE, bty = "L", iso.order = c(1, 2),
+                       xlab = expression(delta^{13}*C~"(‰)"),
+                       ylab = expression(delta^{15}*N~"(‰)"))
+legend("topleft", legend = paste(codes, names(codes)), bty = "n", cex = 0.7)
+SIBER::siberDensityPlot(sea_b_siber, xticklabels = codes[colnames(sea_b_siber)],
+                        xlab = "Strategy", ylab = expression("SEA"[B]~"(‰"^2*")"))
+points(seq_len(ncol(sea_b_siber)), siber_size$SEAc, col = "red", pch = 4, lwd = 2)
+par(mfrow = c(1, 1))
+```
+
+```{r siber-overlap, eval = HAS_SIBER}
+pairs_s <- combn(lev, 2, simplify = FALSE)
+
+# Maximum-likelihood overlap of the ellipses
+ml_ov <- do.call(rbind, lapply(pairs_s, function(pr) {
+  o <- SIBER::maxLikOverlap(ell_id[pr[1]], ell_id[pr[2]], siber, p.interval = SIBER_P, n = 100)
+  data.frame(A = pr[1], B = pr[2], area_A = o[["area.1"]], area_B = o[["area.2"]],
+             overlap_area = o[["overlap"]])
+}))
+
+# Bayesian overlap: one value per posterior draw
+set.seed(SEED)
+bayes_ov <- lapply(pairs_s, function(pr)
+  SIBER::bayesianOverlap(ell_id[pr[1]], ell_id[pr[2]], ell_post,
+                         draws = SIBER_DRAWS, p.interval = SIBER_P, n = 100))
+names(bayes_ov) <- sapply(pairs_s, paste, collapse = " vs ")
+
+q3 <- function(x) sprintf("%.2f (%.2f-%.2f)", median(x, na.rm = TRUE),
+                          quantile(x, 0.025, na.rm = TRUE), quantile(x, 0.975, na.rm = TRUE))
+siber_ov <- do.call(rbind, lapply(seq_along(pairs_s), function(i) {
+  b <- bayes_ov[[i]]; pr <- pairs_s[[i]]
+  ml_i <- ml_ov[i, ]
+  data.frame(
+    A = pr[1], B = pr[2],
+    ML_prop_of_union = ml_i$overlap_area / (ml_i$area_A + ml_i$area_B - ml_i$overlap_area),
+    Bayes_prop_of_union = q3(b$overlap / (b$area1 + b$area2 - b$overlap)),
+    Bayes_prop_of_A = q3(b$overlap / b$area1),     # share of A's ellipse inside B's
+    Bayes_prop_of_B = q3(b$overlap / b$area2))     # share of B's ellipse inside A's
+}))
+siber_ov %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(siber_ov, file.path(OUT, "B_SIBER_overlap.csv"), row.names = FALSE)
+```
+
+```{r siber-overlap-plot, eval = HAS_SIBER, fig.height = 4}
+g <- bind_rows(lapply(names(bayes_ov), function(nm) {
+  b <- bayes_ov[[nm]]
+  data.frame(pair = nm, prop = b$overlap / (b$area1 + b$area2 - b$overlap))
+})) %>%
+  ggplot(aes(pair, prop)) + geom_violin(fill = "grey80", colour = NA) +
+  stat_summary(fun.data = function(x) data.frame(y = median(x), ymin = quantile(x, .025),
+                                                 ymax = quantile(x, .975))) +
+  coord_cartesian(ylim = c(0, 1)) + theme_bw() +
+  labs(x = NULL, y = "Overlap (proportion of combined ellipse area)",
+       caption = paste0(SIBER_P * 100, "% ellipses; median and 95% credible interval"))
+g
+ggsave(file.path(FIG, "B_SIBER_overlap.pdf"), g, width = 7, height = 4)
+```
+
+**Reading the two approaches together.** Use SEAc / SEA_B (SIBER) to report
+niche width, and nicheROVER's directional probabilities as the main overlap
+result, with SIBER's area overlap as a check. They should agree on which pairs
+overlap most, even though the values differ. With only a handful of seals in
+the smallest strategy, its ellipse and every overlap involving it are
+uncertain; report the credible intervals.
+
 ## Sensitivity of the isotopic results
 
 * **One trip per seal** — removes repeated individuals.
@@ -769,7 +894,9 @@ list(
   isotope_tests = iso_tests %>% dplyr::select(response, covariates, p_perm, p_BH),
   isotope_equivalence = tost %>% dplyr::select(isotope, contrast, estimate, equivalent, different),
   niche_size = size_tab %>% dplyr::select(strategy, n, SEAc, SEAb_median),
-  overlap_95 = round(ov_mean[, , 1], 1))
+  overlap_95 = round(ov_mean[, , 1], 1),
+  SIBER_size = if (exists("siber_size")) siber_size else "SIBER not run",
+  SIBER_overlap = if (exists("siber_ov")) siber_ov else "SIBER not run")
 saveRDS(dat, file.path(OUT, "PB_strategies.rds"))
 sessionInfo()
 ```
@@ -801,6 +928,11 @@ multivariate outliers, alternative clustering algorithms, and one trip per
 individual. Stable isotope values (δ¹³C, δ¹⁵N) were not used to define
 strategies and were analysed independently: differences among strategies were
 tested with Freedman–Lane permutation tests including year as a covariate,
-equivalence was assessed with two one-sided tests, and isotopic niche size
-(SEA_B, 95 % niche region) and directional overlap were estimated with
-nicheROVER under its default non-informative prior.*
+equivalence was assessed with two one-sided tests. Isotopic niche width was
+estimated as the sample-size-corrected standard ellipse area (SEAc) and its
+Bayesian estimate (SEA_B; SIBER, Jackson et al. 2011; 2 chains of 20,000
+iterations, burn-in 1,000, thinning 10, default priors). Niche overlap was
+estimated as the directional probability that an individual of one strategy
+falls within the 95 % niche region of another (nicheROVER, default
+non-informative prior; Swanson et al. 2015), and, as a check, as the area
+shared by the Bayesian 95 % ellipses relative to their combined area (SIBER).*
