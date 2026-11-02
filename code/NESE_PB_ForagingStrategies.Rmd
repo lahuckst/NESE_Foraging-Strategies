@@ -41,7 +41,7 @@ library(ggplot2)
 library(FactoMineR)
 library(factoextra)
 library(cluster)     # clusGap, silhouette
-library(mclust)      # adjustedRandIndex
+# mclust is called as mclust::adjustedRandIndex (attaching it masks dplyr::count)
 library(nicheROVER)
 # MASS is called as MASS:: to avoid masking dplyr::select
 ```
@@ -123,7 +123,7 @@ contribute more than one trip; this is checked in the sensitivity analyses
 (one trip per seal).
 
 ```{r repeats}
-dat %>% filter(!is.na(MainID)) %>% count(MainID) %>% filter(n > 1)
+dat %>% filter(!is.na(MainID)) %>% dplyr::count(MainID) %>% filter(n > 1)
 ```
 
 ## Data checks
@@ -328,7 +328,7 @@ res.hcpc <- HCPC(res.pca, nb.clust = K, consol = TRUE, graph = FALSE)
 cl <- as.integer(res.hcpc$data.clust$clust)
 ref_K <- stab[[as.character(K)]]$ref
 cat("Agreement with the bootstrap reference partition (ARI):",
-    round(adjustedRandIndex(cl, ref_K), 3), "\n")
+    round(mclust::adjustedRandIndex(cl, ref_K), 3), "\n")
 # Jaccard values re-indexed to the HCPC cluster numbers
 jac_cl <- stab[[as.character(K)]]$jaccard[
   sapply(1:K, function(j) as.integer(names(which.max(table(ref_K[cl == j])))))]
@@ -409,7 +409,7 @@ Each alternative is compared with the final partition with the adjusted Rand
 index (ARI = 1: identical; > 0.8: very similar).
 
 ```{r sensitivity}
-ari <- function(a, b) round(adjustedRandIndex(a, b), 3)
+ari <- function(a, b) round(mclust::adjustedRandIndex(a, b), 3)
 sens <- list()
 
 for (nd in setdiff(c(N_DIM - 1, N_DIM + 1, length(BEHAV)), 1))
