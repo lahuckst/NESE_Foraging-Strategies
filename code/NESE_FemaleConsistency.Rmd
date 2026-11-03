@@ -76,6 +76,7 @@ ISO_EXCLUDE <- c("RG180", "RG182", "RG184", "RG185", "RG187", "RG191")
 N_PERM      <- 9999   # permutations / randomisations
 N_RPT_BOOT  <- 1000   # rptR bootstrap replicates (CIs)
 N_RPT_PERM  <- 1000   # rptR permutations (P-values)
+MIN_REP_WITHIN <- 5   # minimum repeat females to estimate repeatability within one trip type
 
 OUT <- "../results/female_consistency"
 FIG <- "../figures/female_consistency"
@@ -103,19 +104,38 @@ cohen_kappa <- function(a, b) {
   (po - pe) / (1 - pe)
 }
 
-# Tidy summary of an rptR object for the "MainID" component
-rpt_row <- function(r, label, n_obs, n_ind, n_rep) {
-  out <- tryCatch(data.frame(
-    variable = label, n_obs = n_obs, n_females = n_ind, n_repeat_females = n_rep,
-    R = as.numeric(r$R[["MainID"]][1]),
-    lwr = as.numeric(r$CI_emp["MainID", 1]), upr = as.numeric(r$CI_emp["MainID", 2]),
-    P_LRT = as.numeric(r$P["MainID", "LRT_P"]),
-    P_permut = as.numeric(r$P["MainID", "permut_P"])),
-    error = function(e) data.frame(variable = label, n_obs = n_obs, n_females = n_ind,
-                                   n_repeat_females = n_rep, R = NA, lwr = NA, upr = NA,
-                                   P_LRT = NA, P_permut = NA))
-  if (is.na(out$R)) { message("Could not extract R for ", label, "; full output:"); print(summary(r)) }
+# Fit rptR::rpt() without printing its progress bars into the report
+fit_rpt <- function(...) {
+  out <- NULL
+  invisible(capture.output(out <- rpt(...)))
   out
+}
+
+# Read one random-effect component (e.g. "MainID") from rptR's printed summary.
+# rptR's object layout differs between versions; the printed summary does not.
+rpt_parse <- function(r, comp) {
+  txt <- capture.output(print(summary(r)))
+  i <- grep(paste0("^\\s*", comp, " \\("), txt)[1]
+  if (is.na(i)) return(NULL)
+  k <- grep("Repeatability estimation overview", txt)
+  k <- k[k > i][1]
+  if (is.na(k)) return(NULL)
+  hdr  <- strsplit(trimws(txt[k + 1]), "\\s+")[[1]]
+  vals <- suppressWarnings(as.numeric(strsplit(trimws(txt[k + 2]), "\\s+")[[1]]))
+  if (length(hdr) != length(vals)) return(NULL)
+  setNames(vals, hdr)
+}
+
+# One row of results: female repeatability (R, CI, P) and the share of variance due to year
+rpt_row <- function(r, label, n_obs, n_ind, n_rep) {
+  v  <- if (is.null(r)) NULL else rpt_parse(r, "MainID")
+  vy <- if (is.null(r)) NULL else rpt_parse(r, "Year")
+  g  <- function(x, nm) if (!is.null(x) && nm %in% names(x)) unname(x[[nm]]) else NA_real_
+  if (is.null(v) && !is.null(r)) { message("Could not read R for ", label, "; full output:"); print(summary(r)) }
+  data.frame(variable = label, n_obs = n_obs, n_females = n_ind, n_repeat_females = n_rep,
+             R = g(v, "R"), SE = g(v, "SE"), lwr = g(v, "2.5%"), upr = g(v, "97.5%"),
+             P_LRT = g(v, "LRT_P"), P_permut = g(v, "P_permut"),
+             R_year = g(vy, "R"), P_LRT_year = g(vy, "LRT_P"))
 }
 
 # Draw one element at random (safe when x has length 1, unlike sample())
@@ -231,9 +251,9 @@ Z <- trk %>% group_by(trip) %>% mutate(across(all_of(BEHAV), ~ as.numeric(scale(
   ungroup() %>% dplyr::select(all_of(BEHAV))
 pca_all <- prcomp(Z, center = TRUE, scale. = FALSE)
 trk$Dim1 <- pca_all$x[, 1]; trk$Dim2 <- pca_all$x[, 2]
-# Orient: Dim1 positive = higher latitude; Dim2 positive = more California Current use
+# Orient: Dim1 positive = higher latitude; Dim2 positive = longer dives (diving-effort axis)
 if (cor(trk$Dim1, trk$MaxLat_degrees) < 0) trk$Dim1 <- -trk$Dim1
-if (cor(trk$Dim2, trk$MesoEcoProportionCAC) < 0) trk$Dim2 <- -trk$Dim2
+if (cor(trk$Dim2, trk$Mean_Duration_sec) < 0) trk$Dim2 <- -trk$Dim2
 round(100 * summary(pca_all)$importance[2, 1:4], 1)
 ax <- sapply(c("Dim1", "Dim2"), function(d) cor(trk[BEHAV], trk[[d]])[, 1])
 lapply(c(Dim1 = "Dim1", Dim2 = "Dim2"), function(d) {
@@ -281,7 +301,7 @@ trk <- trk %>% mutate(MainID = factor(MainID), Year = factor(year), Trip = facto
                       logit_CAC = qlogit(MesoEcoProportionCAC),
                       log_dist_shelf = log(MedianDistToContShelf_km + 1))
 beh_vars <- c(`Dim 1 (latitude / offshore axis)` = "Dim1",
-              `Dim 2 (California Current axis)` = "Dim2",
+              `Dim 2 (diving-effort axis)` = "Dim2",
               `Maximum latitude` = "MaxLat_degrees",
               `California Current use (logit)` = "logit_CAC",
               `Distance to shelf (log)` = "log_dist_shelf")
@@ -289,7 +309,7 @@ beh_vars <- c(`Dim 1 (latitude / offshore axis)` = "Dim1",
 set.seed(SEED)
 rpt_beh <- bind_rows(lapply(names(beh_vars), function(nm) {
   v <- beh_vars[[nm]]
-  r <- rpt(reformulate(c("Trip", "(1 | MainID)", "(1 | Year)"), v),
+  r <- fit_rpt(reformulate(c("Trip", "(1 | MainID)", "(1 | Year)"), v),
            grname = c("MainID", "Year"), data = trk, datatype = "Gaussian",
            nboot = N_RPT_BOOT, npermut = N_RPT_PERM)
   rpt_row(r, nm, nrow(trk), nlevels(trk$MainID), length(rep_ids))
@@ -298,15 +318,21 @@ rpt_beh %>% mutate(across(where(is.double), ~ signif(.x, 3)))
 write.csv(rpt_beh, file.path(OUT, "2_behaviour_repeatability.csv"), row.names = FALSE)
 ```
 
-**Within one trip type** (very few repeat females; shown for completeness):
+**Within one trip type.** Estimated only when at least `MIN_REP_WITHIN`
+females were tracked twice on that trip type; with fewer, the model cannot
+separate within- from between-female variance and R is meaningless (it tends
+to 1).
 
 ```{r rpt-within-type}
 set.seed(SEED)
 rpt_within <- bind_rows(lapply(c("PB", "PM"), function(tp) {
   d <- trk %>% filter(trip == tp) %>% droplevels()
   n_rep <- sum(table(d$MainID) > 1)
-  if (n_rep < 3) return(NULL)
-  r <- tryCatch(rpt(Dim1 ~ (1 | MainID) + (1 | Year), grname = c("MainID", "Year"), data = d,
+  if (n_rep < MIN_REP_WITHIN) {
+    message("Within ", tp, ": only ", n_rep, " repeat females - repeatability not estimated")
+    return(NULL)
+  }
+  r <- tryCatch(fit_rpt(Dim1 ~ (1 | MainID) + (1 | Year), grname = c("MainID", "Year"), data = d,
                     datatype = "Gaussian", nboot = N_RPT_BOOT, npermut = N_RPT_PERM),
                 error = function(e) NULL)
   if (is.null(r)) return(NULL)
@@ -440,11 +466,11 @@ Three specifications, from the original to the recommended one:
 set.seed(SEED)
 rpt_iso <- bind_rows(lapply(ISO, function(v) {
   d_rep <- iso %>% filter(MainID %in% iso_rep) %>% droplevels()
-  ra <- rpt(reformulate(c("Trip", "(1 | MainID)"), v), grname = "MainID", data = d_rep,
+  ra <- fit_rpt(reformulate(c("Trip", "(1 | MainID)"), v), grname = "MainID", data = d_rep,
             datatype = "Gaussian", nboot = N_RPT_BOOT, npermut = N_RPT_PERM)
-  rb <- rpt(reformulate(c("Trip", "(1 | MainID)"), v), grname = "MainID", data = iso,
+  rb <- fit_rpt(reformulate(c("Trip", "(1 | MainID)"), v), grname = "MainID", data = iso,
             datatype = "Gaussian", nboot = N_RPT_BOOT, npermut = N_RPT_PERM)
-  rc <- rpt(reformulate(c("Trip", "(1 | MainID)", "(1 | Year)"), v), grname = c("MainID", "Year"),
+  rc <- fit_rpt(reformulate(c("Trip", "(1 | MainID)", "(1 | Year)"), v), grname = c("MainID", "Year"),
             data = iso, datatype = "Gaussian", nboot = N_RPT_BOOT, npermut = N_RPT_PERM)
   bind_rows(
     rpt_row(ra, paste(v, "(a) repeat females, no year"), nrow(d_rep), nlevels(d_rep$MainID), length(iso_rep)),
