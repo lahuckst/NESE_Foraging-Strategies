@@ -1,4 +1,4 @@
 "A","B","ML_prop_of_union","Bayes_prop_of_union","Bayes_prop_of_A","Bayes_prop_of_B"
-"Subarctic","North Central Pacific",0.584989232763667,"0.48 (0.12-0.68)","0.57 (0.19-0.79)","0.75 (0.23-0.98)"
-"Subarctic","California Current",0.328650898869513,"0.22 (0.00-0.56)","0.46 (0.00-0.99)","0.29 (0.00-0.73)"
-"North Central Pacific","California Current",0.259599176239321,"0.22 (0.00-0.50)","0.53 (0.00-0.99)","0.25 (0.00-0.61)"
+"Subarctic","North Central Pacific",0.584989232763667,"0.50 (0.16-0.66)","0.58 (0.25-0.81)","0.75 (0.30-0.94)"
+"Subarctic","California Current",0.328650898869513,"0.23 (0.00-0.57)","0.46 (0.00-0.98)","0.32 (0.00-0.71)"
+"North Central Pacific","California Current",0.259599176239321,"0.21 (0.00-0.50)","0.50 (0.00-0.99)","0.25 (0.00-0.63)"
