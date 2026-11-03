@@ -1,0 +1,575 @@
+---
+title: "NESE females: do repeat females keep their foraging pattern?"
+author: "Sarah Peterson & Luis Huckstadt"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.align = "center", fig.width = 7, fig.height = 4.5)
+```
+
+# Overview
+
+This replaces `NESE_FemaleRepeatabilityIsotopes.Rmd`. The question — *do
+females tracked more than once keep their individual foraging pattern?* — is
+addressed with four complementary analyses:
+
+1. **Strategy fidelity**: do repeat females keep the same strategy more often
+   than expected by chance? (permutation test; Cohen's κ)
+2. **Behavioural repeatability**: repeatability (R) of the main behavioural
+   axes and of interpretable variables, from mixed models with year as a random
+   effect (`rptR`).
+3. **Spatial fidelity**: is the overlap between two trips of the *same* female
+   higher than between trips of *different* females? (randomisation test on
+   utilisation distributions)
+4. **Isotopic consistency**: population-level repeatability of δ¹³C and δ¹⁵N
+   (adjusted for trip type, with year as a random effect), and a comparison of
+   within-female isotopic differences with differences between different
+   females sampled in the same years.
+
+**What changed from the previous script, and why.** The "individual
+repeatability" index (between-individual variance / (between-individual
+variance + one seal's residual variance)) is not a defined quantity: per-seal
+variances from 2–4 samples are extremely noisy, and conditional residuals from
+the mixed model are shrunk towards each seal's mean, pushing the index towards 1.
+The previous script also attached those values to the wrong seals (`ddply`
+returns seals in alphabetical order, which were then relabelled in data order)
+and dropped one female through hard-coded row indices. Isotopes alone also
+cannot detect switching between the two offshore strategies, which are
+isotopically very similar. Repeatability is therefore estimated here only at
+the population level, and fidelity is tested directly on behaviour and space.
+
+**Run first:** `NESE_PB_ForagingStrategies.Rmd`, `NESE_PM_ForagingStrategies.Rmd`
+(strategy assignments) and `NESE_SpatialStrategies.Rmd` (individual UDs).
+
+```{r libraries}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(rptR)
+library(lme4)
+```
+
+# Settings
+
+```{r settings}
+SEED <- 20261103
+set.seed(SEED)
+
+PCA_DATA    <- "../data/f.PCAdata.1.rds"
+META_FILE   <- "../data/IsotopesDatasetForLuis_2023_4_4.csv"   # TOPPID -> MainID
+REPEAT_DATA <- "../data/NESE_RepeatData.rds"                   # isotope samples (as in the old script)
+PB_ASSIGN   <- "../results/PB_strategies/A_strategy_assignments.csv"
+PM_ASSIGN   <- "../results/PM_strategies/A_strategy_assignments.csv"
+UD_FILE     <- "../results/spatial_strategies/spatial_UDs.rds"
+
+# Seals excluded from the isotope analysis in the original script
+ISO_EXCLUDE <- c("RG180", "RG182", "RG184", "RG185", "RG187", "RG191")
+
+N_PERM      <- 9999   # permutations / randomisations
+N_RPT_BOOT  <- 1000   # rptR bootstrap replicates (CIs)
+N_RPT_PERM  <- 1000   # rptR permutations (P-values)
+
+OUT <- "../results/female_consistency"
+FIG <- "../figures/female_consistency"
+dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
+dir.create(FIG, recursive = TRUE, showWarnings = FALSE)
+
+BEHAV <- c("MaxLat_degrees", "MinLon_degrees", "MedianDistToContShelf_km", "SdDistContShelf_km",
+           "MesoEcoProportionShelf", "MesoEcoProportionCAC", "MesoEcoProportionSubArcticPac",
+           "MesoEcoProportionNorthCPac", "Mean_Depth_m", "Mean_Depth_sd", "Mean_Duration_sec",
+           "Mean_Duration_sd", "Pct_TransitDives", "Pct_ForagingDives", "Pct_DriftDives",
+           "Pct_BenthicDives", "PctTripDiving", "DeepDayForageDivesMedian_m",
+           "DeepNightForageDivesMedian_m")
+ISO <- c("d13C", "d15N")
+TRIP_LAB <- c(PostBreeding = "PB", PostMolt = "PM")
+```
+
+## Helper functions
+
+```{r helpers}
+# Cohen's kappa for two vectors of categorical labels
+cohen_kappa <- function(a, b) {
+  lev <- union(a, b); a <- factor(a, lev); b <- factor(b, lev)
+  tab <- table(a, b); n <- sum(tab)
+  po <- sum(diag(tab)) / n; pe <- sum(rowSums(tab) * colSums(tab)) / n^2
+  (po - pe) / (1 - pe)
+}
+
+# Tidy summary of an rptR object for the "MainID" component
+rpt_row <- function(r, label, n_obs, n_ind, n_rep) {
+  out <- tryCatch(data.frame(
+    variable = label, n_obs = n_obs, n_females = n_ind, n_repeat_females = n_rep,
+    R = as.numeric(r$R[["MainID"]][1]),
+    lwr = as.numeric(r$CI_emp["MainID", 1]), upr = as.numeric(r$CI_emp["MainID", 2]),
+    P_LRT = as.numeric(r$P["MainID", "LRT_P"]),
+    P_permut = as.numeric(r$P["MainID", "permut_P"])),
+    error = function(e) data.frame(variable = label, n_obs = n_obs, n_females = n_ind,
+                                   n_repeat_females = n_rep, R = NA, lwr = NA, upr = NA,
+                                   P_LRT = NA, P_permut = NA))
+  if (is.na(out$R)) { message("Could not extract R for ", label, "; full output:"); print(summary(r)) }
+  out
+}
+
+# Draw one element at random (safe when x has length 1, unlike sample())
+pick1 <- function(x) x[sample.int(length(x), 1)]
+
+# All within-female pairs of rows of d (columns: MainID, TOPPID, trip, year, ...)
+within_pairs <- function(d) {
+  d %>% group_by(MainID) %>% filter(n() > 1) %>%
+    group_modify(function(g, key) {
+      ij <- t(combn(nrow(g), 2))
+      data.frame(TOPPID_1 = g$TOPPID[ij[, 1]], TOPPID_2 = g$TOPPID[ij[, 2]],
+                 trip_1 = g$trip[ij[, 1]], trip_2 = g$trip[ij[, 2]],
+                 year_1 = g$year[ij[, 1]], year_2 = g$year[ij[, 2]])
+    }) %>% ungroup() %>%
+    mutate(pair_type = ifelse(trip_1 == trip_2, paste0(trip_1, "-", trip_2), "PB-PM"),
+           lag_years = abs(year_2 - year_1))
+}
+```
+
+# Data
+
+## Tracked trips
+
+```{r tracked}
+meta <- read.csv(META_FILE) %>%
+  transmute(TOPPID = as.character(TOPPID), MainID = as.character(MainID)) %>%
+  distinct(TOPPID, .keep_all = TRUE)
+
+trk <- readRDS(PCA_DATA) %>%
+  mutate(TOPPID = as.character(TOPPID)) %>%
+  left_join(meta, by = "TOPPID") %>%
+  mutate(trip = unname(TRIP_LAB[as.character(Trip)]),
+         year = as.integer(as.character(ProcedureYear))) %>%
+  filter(!is.na(MainID), !is.na(trip))
+
+# Exclude trips with impossible values (as in the strategy scripts)
+pct  <- grep("^Pct", BEHAV, value = TRUE); prop <- grep("^MesoEco", BEHAV, value = TRUE)
+bad  <- apply(trk[pct], 1, function(x) any(x < 0 | x > 100)) |
+        apply(trk[prop], 1, function(x) any(x < 0 | x > 1))
+cat("Excluded trips with impossible values:", paste(trk$TOPPID[bad], collapse = ", "), "\n")
+trk <- trk[!bad & complete.cases(trk[BEHAV]), ]
+
+# Strategy assignments
+assign <- bind_rows(
+  read.csv(PB_ASSIGN) %>% transmute(TOPPID = as.character(TOPPID), trip = "PB", strategy),
+  read.csv(PM_ASSIGN) %>% transmute(TOPPID = as.character(TOPPID), trip = "PM", strategy))
+trk <- trk %>% left_join(assign, by = c("TOPPID", "trip"))
+
+rep_ids <- trk %>% count(MainID) %>% filter(n > 1) %>% pull(MainID)
+cat(nrow(trk), "tracked trips from", n_distinct(trk$MainID), "females;",
+    length(rep_ids), "females tracked more than once (",
+    sum(trk$MainID %in% rep_ids), "trips)\n")
+
+pairs_trk <- within_pairs(trk %>% dplyr::select(MainID, TOPPID, trip, year))
+table(pairs_trk$pair_type)
+summary(pairs_trk$lag_years)
+```
+
+# 1. Strategy fidelity
+
+For each pair of trips of the same female: did she use the same strategy?
+For PB–PM pairs, "same" means the same offshore region (the coastal strategy
+has no Post-Moult counterpart, so such pairs count as different). The null
+distribution shuffles strategy labels among all trips of the same trip type,
+which keeps how common each strategy is.
+
+```{r fidelity}
+lab <- setNames(trk$strategy, trk$TOPPID)
+fid <- pairs_trk %>%
+  mutate(s1 = lab[TOPPID_1], s2 = lab[TOPPID_2]) %>%
+  filter(!is.na(s1), !is.na(s2)) %>%
+  mutate(same = s1 == s2)
+fid %>% dplyr::select(MainID, pair_type, year_1, s1, year_2, s2, same) %>% arrange(pair_type, MainID)
+
+types <- c(sort(unique(fid$pair_type)), "All pairs")
+idx_by_trip <- split(seq_len(nrow(trk)), trk$trip)
+set.seed(SEED)
+null_same <- replicate(N_PERM, {
+  s <- trk$strategy
+  for (tp in names(idx_by_trip)) { ii <- idx_by_trip[[tp]]; ok <- ii[!is.na(s[ii])]; s[ok] <- sample(s[ok]) }
+  sh <- setNames(s, trk$TOPPID)
+  same <- sh[fid$TOPPID_1] == sh[fid$TOPPID_2]
+  c(tapply(same, fid$pair_type, sum), `All pairs` = sum(same))
+})
+obs_same <- c(tapply(fid$same, fid$pair_type, sum), `All pairs` = sum(fid$same))
+n_pairs  <- c(table(fid$pair_type), `All pairs` = nrow(fid))
+
+fid_tab <- data.frame(pair_type = types, n_pairs = as.vector(n_pairs[types]),
+  n_same = as.vector(obs_same[types]),
+  expected = rowMeans(null_same)[types],
+  P = sapply(types, function(t) (1 + sum(null_same[t, ] >= obs_same[t])) / (N_PERM + 1)),
+  row.names = NULL)
+fid_tab %>% mutate(across(c(expected, P), ~ signif(.x, 3)))
+
+# Cohen's kappa for pairs of the same trip type (first vs second trip)
+kap <- fid %>% filter(pair_type != "PB-PM") %>% group_by(pair_type) %>%
+  summarise(n = n(), kappa = if (n() >= 3) cohen_kappa(s1, s2) else NA_real_)
+kap
+write.csv(fid_tab, file.path(OUT, "1_strategy_fidelity.csv"), row.names = FALSE)
+write.csv(fid, file.path(OUT, "1_strategy_fidelity_pairs.csv"), row.names = FALSE)
+```
+
+# 2. Behavioural repeatability
+
+## A common behavioural space for both trip types
+
+Variables are standardised **within trip type** before the PCA, so the axes
+describe how a female differs from other females on the same kind of trip,
+rather than the large difference between Post-Breeding and Post-Moult trips.
+
+```{r pca-all}
+Z <- trk %>% group_by(trip) %>% mutate(across(all_of(BEHAV), ~ as.numeric(scale(.x)))) %>%
+  ungroup() %>% dplyr::select(all_of(BEHAV))
+pca_all <- prcomp(Z, center = TRUE, scale. = FALSE)
+trk$Dim1 <- pca_all$x[, 1]; trk$Dim2 <- pca_all$x[, 2]
+# Orient: Dim1 positive = higher latitude; Dim2 positive = more California Current use
+if (cor(trk$Dim1, trk$MaxLat_degrees) < 0) trk$Dim1 <- -trk$Dim1
+if (cor(trk$Dim2, trk$MesoEcoProportionCAC) < 0) trk$Dim2 <- -trk$Dim2
+round(100 * summary(pca_all)$importance[2, 1:4], 1)
+ax <- sapply(c("Dim1", "Dim2"), function(d) cor(trk[BEHAV], trk[[d]])[, 1])
+lapply(c(Dim1 = "Dim1", Dim2 = "Dim2"), function(d) {
+  r <- ax[, d]; round(sort(r[abs(r) >= 0.5], decreasing = TRUE), 2) })
+```
+
+## Individual trajectories
+
+Each line joins the trips of one repeat female (points coloured by trip type).
+Flat lines = consistent females.
+
+```{r trajectories, fig.height = 5}
+traj <- trk %>% filter(MainID %in% rep_ids) %>% arrange(MainID, year)
+g <- ggplot(traj, aes(year, Dim1, group = MainID)) +
+  geom_hline(yintercept = 0, colour = "grey70") +
+  geom_line(colour = "grey40") + geom_point(aes(fill = trip), shape = 21, size = 2.5) +
+  scale_fill_manual(values = c(PB = "#1b9e77", PM = "#7570b3"), name = "Trip") +
+  theme_bw() + labs(x = "Year", y = "Dim 1 score (+ = more northerly / Subarctic)",
+                    title = "Repeat females on the main behavioural axis")
+g
+ggsave(file.path(FIG, "2_trajectories_Dim1.pdf"), g, width = 7, height = 5)
+
+g2 <- trk %>% filter(MainID %in% rep_ids) %>%
+  group_by(MainID) %>% mutate(order = rank(year, ties.method = "first")) %>%
+  dplyr::select(MainID, order, Dim1) %>% filter(order <= 2) %>%
+  pivot_wider(names_from = order, values_from = Dim1, names_prefix = "trip_") %>%
+  ggplot(aes(trip_1, trip_2)) + geom_abline(linetype = 2, colour = "grey60") +
+  geom_point(size = 2.5) + coord_equal() + theme_bw() +
+  labs(x = "Dim 1, first trip", y = "Dim 1, second trip")
+g2
+```
+
+## Repeatability (rptR)
+
+Model: `y ~ Trip + (1 | MainID) + (1 | Year)`. R is the adjusted repeatability
+(between-female variance over the sum of the random-effect and residual
+variances, with trip type as a fixed effect). All tracked females are used;
+females tracked once help estimate the variance components, but the
+between-female variance is informed by the repeat females
+(`r length(rep_ids)` here), so CIs are wide.
+
+```{r rpt-behaviour}
+qlogit <- function(p) { e <- 0.005; qlogis(pmin(pmax(p, e), 1 - e)) }
+trk <- trk %>% mutate(MainID = factor(MainID), Year = factor(year), Trip = factor(trip),
+                      logit_CAC = qlogit(MesoEcoProportionCAC),
+                      log_dist_shelf = log(MedianDistToContShelf_km + 1))
+beh_vars <- c(`Dim 1 (latitude / offshore axis)` = "Dim1",
+              `Dim 2 (California Current axis)` = "Dim2",
+              `Maximum latitude` = "MaxLat_degrees",
+              `California Current use (logit)` = "logit_CAC",
+              `Distance to shelf (log)` = "log_dist_shelf")
+
+set.seed(SEED)
+rpt_beh <- bind_rows(lapply(names(beh_vars), function(nm) {
+  v <- beh_vars[[nm]]
+  r <- rpt(reformulate(c("Trip", "(1 | MainID)", "(1 | Year)"), v),
+           grname = c("MainID", "Year"), data = trk, datatype = "Gaussian",
+           nboot = N_RPT_BOOT, npermut = N_RPT_PERM)
+  rpt_row(r, nm, nrow(trk), nlevels(trk$MainID), length(rep_ids))
+}))
+rpt_beh %>% mutate(across(where(is.double), ~ signif(.x, 3)))
+write.csv(rpt_beh, file.path(OUT, "2_behaviour_repeatability.csv"), row.names = FALSE)
+```
+
+**Within one trip type** (very few repeat females; shown for completeness):
+
+```{r rpt-within-type}
+set.seed(SEED)
+rpt_within <- bind_rows(lapply(c("PB", "PM"), function(tp) {
+  d <- trk %>% filter(trip == tp) %>% droplevels()
+  n_rep <- sum(table(d$MainID) > 1)
+  if (n_rep < 3) return(NULL)
+  r <- tryCatch(rpt(Dim1 ~ (1 | MainID) + (1 | Year), grname = c("MainID", "Year"), data = d,
+                    datatype = "Gaussian", nboot = N_RPT_BOOT, npermut = N_RPT_PERM),
+                error = function(e) NULL)
+  if (is.null(r)) return(NULL)
+  rpt_row(r, paste("Dim 1, within", tp), nrow(d), nlevels(d$MainID), n_rep)
+}))
+rpt_within
+```
+
+```{r rpt-plot, fig.height = 3.5}
+g <- ggplot(rpt_beh, aes(R, reorder(variable, R))) +
+  geom_vline(xintercept = 0, colour = "grey60") +
+  geom_errorbar(aes(xmin = lwr, xmax = upr), width = 0.2, orientation = "y") + geom_point(size = 2.5) +
+  coord_cartesian(xlim = c(0, 1)) + theme_bw() +
+  labs(x = "Repeatability (R, 95% CI)", y = NULL)
+g
+ggsave(file.path(FIG, "2_behaviour_repeatability.pdf"), g, width = 7, height = 3.5)
+```
+
+# 3. Spatial fidelity
+
+Bhattacharyya's affinity (BA) between the utilisation distributions of two
+trips of the same female, compared with BA between trips of different females
+of the same pair type. Two nulls:
+
+* **Population null**: the second trip is replaced by a random trip of the same
+  type from a different female. Tests whether females return to *their own*
+  areas rather than just to the population's area.
+* **Strategy null** (same-type pairs only): the replacement trip is drawn from
+  the same strategy. Tests fidelity *beyond* strategy membership.
+
+```{r spatial}
+if (file.exists(UD_FILE)) {
+  ud <- readRDS(UD_FILE)
+  P  <- cbind(ud$P_pb, ud$P_pm)
+  ud_meta <- bind_rows(ud$seals_pb %>% transmute(TOPPID, trip = "PB", strategy),
+                       ud$seals_pm %>% transmute(TOPPID, trip = "PM", strategy)) %>%
+    left_join(trk %>% transmute(TOPPID, MainID = as.character(MainID)), by = "TOPPID") %>%
+    filter(!is.na(MainID))
+  P  <- P[, ud_meta$TOPPID, drop = FALSE]
+  BA <- crossprod(sqrt(P))
+
+  sp <- pairs_trk %>% filter(TOPPID_1 %in% ud_meta$TOPPID, TOPPID_2 %in% ud_meta$TOPPID) %>%
+    mutate(BA = BA[cbind(TOPPID_1, TOPPID_2)])
+  cat(nrow(sp), "within-female trip pairs with UDs\n"); print(table(sp$pair_type))
+
+  # Candidate replacement trips for the second member of each pair
+  fem   <- setNames(ud_meta$MainID, ud_meta$TOPPID)
+  tripv <- setNames(ud_meta$trip, ud_meta$TOPPID)
+  strv  <- setNames(ud_meta$strategy, ud_meta$TOPPID)
+  cand_pop <- lapply(seq_len(nrow(sp)), function(k)
+    ud_meta$TOPPID[ud_meta$trip == tripv[sp$TOPPID_2[k]] & ud_meta$MainID != sp$MainID[k]])
+  cand_str <- lapply(seq_len(nrow(sp)), function(k)
+    ud_meta$TOPPID[ud_meta$trip == tripv[sp$TOPPID_2[k]] & ud_meta$MainID != sp$MainID[k] &
+                   ud_meta$strategy == strv[sp$TOPPID_2[k]]])
+
+  randomise <- function(cands, rows) {
+    set.seed(SEED)
+    replicate(N_PERM, {
+      j  <- vapply(cands[rows], function(cc) if (length(cc)) pick1(cc) else NA_character_, "")
+      ok <- !is.na(j)
+      mean(BA[cbind(sp$TOPPID_1[rows][ok], j[ok])])
+    })
+  }
+  sp_tab <- bind_rows(lapply(c(sort(unique(sp$pair_type)), "All pairs"), function(tp) {
+    rows <- if (tp == "All pairs") seq_len(nrow(sp)) else which(sp$pair_type == tp)
+    obs  <- mean(sp$BA[rows])
+    n_pop <- randomise(cand_pop, rows)
+    n_str <- if (tp %in% c("PB-PB", "PM-PM")) randomise(cand_str, rows) else NA
+    data.frame(pair_type = tp, n_pairs = length(rows), BA_same_female = obs,
+               BA_null_population = mean(n_pop), P_population = (1 + sum(n_pop >= obs)) / (N_PERM + 1),
+               BA_null_strategy = if (all(is.na(n_str))) NA else mean(n_str),
+               P_strategy = if (all(is.na(n_str))) NA else (1 + sum(n_str >= obs)) / (N_PERM + 1))
+  }))
+  print(sp_tab %>% mutate(across(where(is.double), ~ signif(.x, 3))))
+  write.csv(sp_tab, file.path(OUT, "3_spatial_fidelity.csv"), row.names = FALSE)
+
+  # Figure: BA for same-female pairs vs all different-female pairs of the same type
+  ij <- which(upper.tri(BA), arr.ind = TRUE)
+  allp <- data.frame(a = colnames(BA)[ij[, 1]], b = colnames(BA)[ij[, 2]], BA = BA[ij]) %>%
+    mutate(fa = fem[a], fb = fem[b], ta = tripv[a], tb = tripv[b],
+           pair_type = ifelse(ta == tb, paste0(ta, "-", tb), "PB-PM")) %>%
+    filter(fa != fb) %>% mutate(which = "Different females")
+  g <- ggplot() +
+    geom_violin(data = allp, aes(pair_type, BA), fill = "grey85", colour = NA) +
+    geom_jitter(data = sp, aes(pair_type, BA), width = 0.08, height = 0, size = 2.2, colour = "#d95f02") +
+    theme_bw() + coord_cartesian(ylim = c(0, 1)) +
+    labs(x = NULL, y = "UD overlap (Bhattacharyya's affinity)",
+         caption = "Grey: pairs of different females; orange: two trips of the same female")
+  print(g)
+  ggsave(file.path(FIG, "3_spatial_fidelity.pdf"), g, width = 7, height = 4.5)
+} else {
+  message("Run NESE_SpatialStrategies.Rmd first: ", UD_FILE, " not found.")
+}
+```
+
+# 4. Isotopic consistency
+
+## Data
+
+The same sample set as the previous script: arrival samples of females, with
+the same exclusions.
+
+```{r iso-data}
+iso_raw <- if (file.exists(REPEAT_DATA)) readRDS(REPEAT_DATA) else read.csv(META_FILE)
+stopifnot(all(c("MainID", "Sex", "TimePeriod", "Trip", "ProcedureYear", ISO) %in% names(iso_raw)))
+iso <- iso_raw %>%
+  filter(Sex == "Female", TimePeriod == "Arrival", !is.na(d13C), !is.na(d15N),
+         !MainID %in% ISO_EXCLUDE) %>%
+  transmute(MainID = factor(as.character(MainID)),
+            trip = unname(TRIP_LAB[as.character(Trip)]), Trip = factor(trip),
+            year = as.integer(as.character(ProcedureYear)), Year = factor(year),
+            d13C, d15N) %>%
+  filter(!is.na(trip))
+iso_rep <- names(which(table(iso$MainID) > 1))
+cat(nrow(iso), "samples from", nlevels(iso$MainID), "females;", length(iso_rep),
+    "females sampled more than once\n")
+table(table(iso$MainID))
+```
+
+## Population-level repeatability
+
+Three specifications, from the original to the recommended one:
+
+* (a) **original**: repeat females only, `y ~ Trip + (1 | MainID)`;
+* (b) all females, same model;
+* (c) **recommended**: all females, `y ~ Trip + (1 | MainID) + (1 | Year)`,
+  which removes consistency that is only due to shared isotopic baselines in
+  similar years.
+
+```{r rpt-iso}
+set.seed(SEED)
+rpt_iso <- bind_rows(lapply(ISO, function(v) {
+  d_rep <- iso %>% filter(MainID %in% iso_rep) %>% droplevels()
+  ra <- rpt(reformulate(c("Trip", "(1 | MainID)"), v), grname = "MainID", data = d_rep,
+            datatype = "Gaussian", nboot = N_RPT_BOOT, npermut = N_RPT_PERM)
+  rb <- rpt(reformulate(c("Trip", "(1 | MainID)"), v), grname = "MainID", data = iso,
+            datatype = "Gaussian", nboot = N_RPT_BOOT, npermut = N_RPT_PERM)
+  rc <- rpt(reformulate(c("Trip", "(1 | MainID)", "(1 | Year)"), v), grname = c("MainID", "Year"),
+            data = iso, datatype = "Gaussian", nboot = N_RPT_BOOT, npermut = N_RPT_PERM)
+  bind_rows(
+    rpt_row(ra, paste(v, "(a) repeat females, no year"), nrow(d_rep), nlevels(d_rep$MainID), length(iso_rep)),
+    rpt_row(rb, paste(v, "(b) all females, no year"), nrow(iso), nlevels(iso$MainID), length(iso_rep)),
+    rpt_row(rc, paste(v, "(c) all females, year random"), nrow(iso), nlevels(iso$MainID), length(iso_rep)))
+}))
+rpt_iso %>% mutate(across(where(is.double), ~ signif(.x, 3)))
+write.csv(rpt_iso, file.path(OUT, "4_isotope_repeatability.csv"), row.names = FALSE)
+
+# Model checks for the recommended model
+for (v in ISO) {
+  m <- lmer(reformulate(c("Trip", "(1 | MainID)", "(1 | Year)"), v), data = iso)
+  par(mfrow = c(1, 2)); plot(fitted(m), resid(m), main = v, xlab = "Fitted", ylab = "Residual")
+  qqnorm(resid(m), main = v); qqline(resid(m)); par(mfrow = c(1, 1))
+}
+```
+
+## Within-female differences vs different females in the same years
+
+For every pair of samples from the same female, the absolute isotopic
+difference is compared with that between two *different* females sampled in the
+same two years and trip types (same baselines). If females are consistent,
+their own differences are smaller than these year-matched pairs.
+
+```{r iso-pairs}
+iso_pairs <- within_pairs(iso %>% transmute(MainID = as.character(MainID),
+                                            TOPPID = paste0(MainID, "_", row_number()),
+                                            trip, year))
+iso_key <- iso %>% mutate(key = paste0(as.character(MainID), "_", row_number()))
+val <- iso_key %>% dplyr::select(key, d13C, d15N)
+iso_pairs <- iso_pairs %>%
+  mutate(d13C_1 = val$d13C[match(TOPPID_1, val$key)], d13C_2 = val$d13C[match(TOPPID_2, val$key)],
+         d15N_1 = val$d15N[match(TOPPID_1, val$key)], d15N_2 = val$d15N[match(TOPPID_2, val$key)],
+         abs_d13C = abs(d13C_1 - d13C_2), abs_d15N = abs(d15N_1 - d15N_2))
+cat(nrow(iso_pairs), "within-female sample pairs\n")
+
+# Candidate samples from other females with the same year and trip type (fallback: same trip type)
+pool <- iso_key %>% transmute(key, MainID = as.character(MainID), trip, year, d13C, d15N)
+cands <- function(fem, tp, yr) {
+  c1 <- which(pool$MainID != fem & pool$trip == tp & pool$year == yr)
+  if (length(c1)) c1 else which(pool$MainID != fem & pool$trip == tp)
+}
+c1 <- lapply(seq_len(nrow(iso_pairs)), function(k) cands(iso_pairs$MainID[k], iso_pairs$trip_1[k], iso_pairs$year_1[k]))
+c2 <- lapply(seq_len(nrow(iso_pairs)), function(k) cands(iso_pairs$MainID[k], iso_pairs$trip_2[k], iso_pairs$year_2[k]))
+
+set.seed(SEED)
+null_iso <- replicate(N_PERM, {
+  d <- vapply(seq_len(nrow(iso_pairs)), function(k) {
+    a <- pick1(c1[[k]])
+    b_c <- c2[[k]][pool$MainID[c2[[k]]] != pool$MainID[a]]
+    if (!length(b_c)) return(c(NA_real_, NA_real_))
+    b <- pick1(b_c)
+    c(abs(pool$d13C[a] - pool$d13C[b]), abs(pool$d15N[a] - pool$d15N[b]))
+  }, numeric(2))
+  rowMeans(d, na.rm = TRUE)
+})
+iso_tab <- data.frame(isotope = ISO,
+  mean_abs_diff_same_female = c(mean(iso_pairs$abs_d13C), mean(iso_pairs$abs_d15N)),
+  mean_abs_diff_year_matched_null = rowMeans(null_iso),
+  P = c((1 + sum(null_iso[1, ] <= mean(iso_pairs$abs_d13C))) / (N_PERM + 1),
+        (1 + sum(null_iso[2, ] <= mean(iso_pairs$abs_d15N))) / (N_PERM + 1)))
+iso_tab %>% mutate(across(where(is.double), ~ signif(.x, 3)))
+write.csv(iso_tab, file.path(OUT, "4_isotope_pair_differences.csv"), row.names = FALSE)
+```
+
+## Does consistency decline with time between samples?
+
+```{r iso-lag, fig.height = 4}
+lag_tests <- sapply(c(d13C = "abs_d13C", d15N = "abs_d15N"), function(v) {
+  ct <- cor.test(iso_pairs$lag_years, iso_pairs[[v]], method = "spearman", exact = FALSE)
+  c(rho = unname(ct$estimate), P = ct$p.value)
+})
+round(lag_tests, 3)
+
+g <- iso_pairs %>% dplyr::select(lag_years, pair_type, abs_d13C, abs_d15N) %>%
+  pivot_longer(c(abs_d13C, abs_d15N), names_to = "isotope", values_to = "diff") %>%
+  mutate(isotope = recode(isotope, abs_d13C = "|Δ δ¹³C|", abs_d15N = "|Δ δ¹⁵N|")) %>%
+  ggplot(aes(lag_years, diff)) +
+  geom_hline(data = data.frame(isotope = c("|Δ δ¹³C|", "|Δ δ¹⁵N|"),
+                               y = rowMeans(null_iso)),
+             aes(yintercept = y), linetype = 2, colour = "grey50") +
+  geom_jitter(aes(shape = pair_type), width = 0.1, height = 0, size = 2.2) +
+  geom_smooth(method = "lm", formula = y ~ x, colour = "black", se = TRUE) +
+  facet_wrap(~ isotope, scales = "free_y") + theme_bw() +
+  labs(x = "Years between samples", y = "Absolute difference (‰)", shape = "Pair",
+       caption = "Dashed: mean difference between different females in the same years")
+g
+ggsave(file.path(FIG, "4_isotope_differences_vs_lag.pdf"), g, width = 8, height = 4, device = cairo_pdf)
+```
+
+# Summary
+
+```{r summary}
+list(
+  strategy_fidelity = fid_tab,
+  kappa = kap,
+  behaviour_repeatability = rpt_beh %>% dplyr::select(variable, R, lwr, upr, P_LRT, P_permut),
+  spatial_fidelity = if (exists("sp_tab")) sp_tab else "UDs not available",
+  isotope_repeatability = rpt_iso %>% dplyr::select(variable, R, lwr, upr, P_LRT),
+  isotope_pairs = iso_tab,
+  isotope_lag = round(lag_tests, 3))
+sessionInfo()
+```
+
+# Suggested Methods text
+
+*We assessed whether females tracked on more than one trip kept their
+foraging pattern with four complementary analyses. (1) Strategy fidelity: for
+each pair of trips by the same female we recorded whether she used the same
+strategy (for post-breeding–post-moult pairs, the same offshore region), and
+compared the number of consistent pairs with a null distribution obtained by
+permuting strategy labels among trips of the same type (9,999 permutations);
+we also report Cohen's κ. (2) Behavioural repeatability: after standardising
+behavioural variables within trip type, we summarised them by principal
+component analysis and estimated the adjusted repeatability of the first two
+components and of maximum latitude, California Current use and distance to the
+continental shelf with linear mixed models including trip type as a fixed
+effect and female and year as random effects (rptR; Stoffel et al. 2017;
+parametric bootstrap CIs and permutation tests). (3) Spatial fidelity: we
+compared the overlap (Bhattacharyya's affinity) between utilisation
+distributions of two trips of the same female with that obtained when one trip
+was replaced by a random trip of the same type from a different female, and, for
+pairs of the same trip type, from a different female of the same strategy
+(9,999 randomisations). (4) Isotopic consistency: we estimated the adjusted
+repeatability of δ¹³C and δ¹⁵N with trip type as a fixed effect and female and
+year as random effects, and compared absolute isotopic differences between
+samples of the same female with those between different females sampled in the
+same years and trip types (9,999 randomisations).*
