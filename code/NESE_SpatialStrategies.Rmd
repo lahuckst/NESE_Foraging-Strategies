@@ -1,0 +1,536 @@
+---
+title: "NESE females: spatial distribution of Post-Breeding strategies and the Post-Moult continuum"
+author: "Luis Huckstadt"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.align = "center", fig.width = 9, fig.height = 6)
+```
+
+# Overview
+
+Maps of where the foraging strategies forage, built so that all maps are
+directly comparable:
+
+* **One projection, one grid, one bandwidth** for every map (Post-Breeding and
+  Post-Moult), so differences between maps reflect the seals, not the method.
+* **Individual utilisation distributions (UDs)**, one per seal, then averaged
+  within a strategy, so each seal has equal weight regardless of track length.
+
+Figures:
+
+1. **Post-Breeding strategies** — 50 % (core) and 95 % UDs per strategy, with
+   tracks shown for small strategies, plus overlap statistics.
+2. **Post-Moult continuum** — instead of group polygons, maps of the
+   UD-weighted mean gradient score in each grid cell (where do seals at each end
+   of the gradient forage?), and each seal's foraging centroid coloured by its
+   score.
+3. **Isotope maps** — UD-weighted mean δ¹³C and δ¹⁵N per cell, for both trips.
+
+Inputs: assignments from `NESE_PB_ForagingStrategies.Rmd` and
+`NESE_PM_ForagingStrategies.Rmd` (run those first), the 6-hourly tracks, and the
+behavioural/isotope data. The population-level KBA maps (track2KBA) answer a
+different, conservation question and remain in the `NESEtracks2KBA_*` scripts.
+
+```{r libraries}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(sf)
+# MASS is called as MASS:: to avoid masking dplyr::select
+sf_use_s2(FALSE)
+```
+
+# Settings
+
+```{r settings}
+SEED <- 20261103
+set.seed(SEED)
+
+# Files
+TRACKS_FILE <- "../data/NESETracks6h.csv"
+PCA_DATA    <- "../data/f.PCAdata.1.rds"
+PB_ASSIGN   <- "../results/PB_strategies/A_strategy_assignments.csv"
+PM_ASSIGN   <- "../results/PM_strategies/A_strategy_assignments.csv"
+GSHHS_DIR   <- "../data/GSHHS_shp"                  # coastline (local only, not in GitHub)
+ISO200_FILE <- "../data/Shelf/ETOPO2024_200m_NP.shp" # 200 m isobath (local only)
+
+# Projection and grid (common to ALL maps)
+LAEA     <- "+proj=laea +lat_0=47 +lon_0=-150 +units=km +datum=WGS84"
+CELL_KM  <- 25
+MAP_PAD_KM <- 250                     # margin around the tracks
+
+# Utilisation distributions
+COLONY_LONLAT    <- c(-122.33, 37.11) # Año Nuevo
+COLONY_BUFFER_KM <- 100               # as in track2KBA tripSplit / ColDist filter
+MIN_LOCS         <- 20                # minimum at-sea locations per seal
+KERNEL_SD_KM     <- 50                # kernel standard deviation, common to all seals
+KERNEL_SD_SENS   <- c(25, 50, 100)    # bandwidth sensitivity
+SMALL_N          <- 10                # draw individual tracks for strategies smaller than this
+
+# Gradient and isotope maps
+POP_MASK  <- 0.95   # only map cells inside the population 95% UD
+MIN_NEFF  <- 3      # ... and used by at least this many "effective" seals
+# Orientation of the gradient axes: positive scores = more of this variable
+ORIENT <- c(Dim1 = "MaxLat_degrees", Dim2 = "MesoEcoProportionCAC")
+
+# Colours: same strategy colours in every figure of the paper
+STRAT_COLS <- c("Subarctic"             = "#1b9e77",
+                "North Central Pacific" = "#d95f02",
+                "California Current"    = "#7570b3")
+
+OUT <- "../results/spatial_strategies"
+FIG <- "../figures/spatial_strategies"
+dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
+dir.create(FIG, recursive = TRUE, showWarnings = FALSE)
+
+BEHAV <- c("MaxLat_degrees", "MinLon_degrees", "MedianDistToContShelf_km", "SdDistContShelf_km",
+           "MesoEcoProportionShelf", "MesoEcoProportionCAC", "MesoEcoProportionSubArcticPac",
+           "MesoEcoProportionNorthCPac", "Mean_Depth_m", "Mean_Depth_sd", "Mean_Duration_sec",
+           "Mean_Duration_sd", "Pct_TransitDives", "Pct_ForagingDives", "Pct_DriftDives",
+           "Pct_BenthicDives", "PctTripDiving", "DeepDayForageDivesMedian_m",
+           "DeepNightForageDivesMedian_m")
+ISO <- c("d13C", "d15N")
+```
+
+# Data
+
+## Strategy assignments, gradient scores and isotopes
+
+```{r assignments}
+stopifnot(file.exists(PB_ASSIGN), file.exists(PM_ASSIGN))
+pb_assign <- read.csv(PB_ASSIGN) %>% mutate(TOPPID = as.character(TOPPID), trip = "PB")
+pm_assign <- read.csv(PM_ASSIGN) %>% mutate(TOPPID = as.character(TOPPID), trip = "PM")
+table(pb_assign$strategy); table(pm_assign$strategy)
+
+trips_dat <- readRDS(PCA_DATA) %>% mutate(TOPPID = as.character(TOPPID))
+
+# Post-Moult gradient: same PCA as NESE_PM_ForagingStrategies.Rmd (same trips,
+# standardised behavioural variables). Axes are oriented so that positive
+# scores mean more of the ORIENT variable.
+pm_beh <- trips_dat %>% filter(Trip == "PostMolt", TOPPID %in% pm_assign$TOPPID)
+pm_pca <- prcomp(pm_beh[BEHAV], center = TRUE, scale. = TRUE)
+pm_scores <- data.frame(TOPPID = pm_beh$TOPPID, pm_pca$x[, 1:2])
+names(pm_scores)[2:3] <- c("Dim1", "Dim2")
+for (d in names(ORIENT))
+  if (cor(pm_scores[[d]], pm_beh[[ORIENT[[d]]]]) < 0) pm_scores[[d]] <- -pm_scores[[d]]
+pm_scores$CAC <- pm_beh$MesoEcoProportionCAC
+
+cat("Variance explained by Dim1, Dim2:",
+    round(100 * summary(pm_pca)$importance[2, 1:2], 1), "%\n")
+# What the oriented axes represent (correlations with the original variables, |r| >= 0.5)
+ax_cor <- sapply(c("Dim1", "Dim2"), function(d) cor(pm_beh[BEHAV], pm_scores[[d]])[, 1])
+lapply(c(Dim1 = "Dim1", Dim2 = "Dim2"), function(d) {
+  r <- ax_cor[, d]; round(sort(r[abs(r) >= 0.5], decreasing = TRUE), 2) })
+
+# Check: how the two Post-Moult modes sit on the gradient
+pm_scores %>% left_join(pm_assign %>% dplyr::select(TOPPID, strategy), by = "TOPPID") %>%
+  group_by(strategy) %>% summarise(n = n(), across(c(Dim1, Dim2), ~ round(mean(.x), 2)))
+
+iso_dat <- trips_dat %>%
+  mutate(trip = recode(Trip, PostBreeding = "PB", PostMolt = "PM")) %>%
+  dplyr::select(TOPPID, trip, all_of(ISO))
+```
+
+## Tracks
+
+```{r tracks}
+tracks <- read.csv(TRACKS_FILE) %>%
+  transmute(TOPPID = as.character(track_id), trip = Season,
+            longitude = ((longitude + 180) %% 360) - 180,   # wrap to -180..180 (some PM tracks < -180)
+            latitude) %>%
+  filter(trip %in% c("PB", "PM"))
+
+xy <- st_coordinates(st_transform(
+  st_as_sf(tracks, coords = c("longitude", "latitude"), crs = 4326), LAEA))
+colony_xy <- st_coordinates(st_transform(st_sfc(st_point(COLONY_LONLAT), crs = 4326), LAEA))
+tracks <- tracks %>%
+  mutate(x = xy[, 1], y = xy[, 2],
+         d_col = sqrt((x - colony_xy[1])^2 + (y - colony_xy[2])^2)) %>%
+  filter(d_col > COLONY_BUFFER_KM)
+
+assign_all <- bind_rows(pb_assign, pm_assign) %>% dplyr::select(TOPPID, trip, strategy)
+tracks <- tracks %>% inner_join(assign_all, by = c("TOPPID", "trip")) %>%
+  group_by(TOPPID, trip) %>% filter(n() >= MIN_LOCS) %>% ungroup()
+
+# Seals with a strategy but no usable track
+missing <- anti_join(assign_all, distinct(tracks, TOPPID, trip), by = c("TOPPID", "trip"))
+cat("Assigned trips without a usable track:", nrow(missing), "\n")
+missing
+seals <- tracks %>% distinct(trip, TOPPID, strategy)
+table(seals$trip, seals$strategy)
+```
+
+## Common grid and map extent
+
+```{r grid}
+pad  <- 3 * max(KERNEL_SD_SENS)
+lims <- c(range(tracks$x) + c(-pad, pad), range(tracks$y) + c(-pad, pad))
+nx <- ceiling(diff(lims[1:2]) / CELL_KM) + 1
+ny <- ceiling(diff(lims[3:4]) / CELL_KM) + 1
+grid <- expand.grid(x = seq(lims[1], lims[2], length.out = nx),
+                    y = seq(lims[3], lims[4], length.out = ny))
+cell_w <- diff(lims[1:2]) / (nx - 1); cell_h <- diff(lims[3:4]) / (ny - 1)
+cat("Grid:", nx, "x", ny, "cells of ~", round(cell_w), "x", round(cell_h), "km\n")
+
+MAP_XLIM <- range(tracks$x) + c(-MAP_PAD_KM, MAP_PAD_KM)   # same extent for every map
+MAP_YLIM <- range(tracks$y) + c(-MAP_PAD_KM, MAP_PAD_KM)
+```
+
+## Base map
+
+The coastline and 200 m isobath are read from the local files used in the
+track2KBA scripts. If they are not found, the script falls back to
+`rnaturalearth` (if installed) or draws the maps without land.
+
+```{r basemap}
+crop_box <- st_as_sfc(st_bbox(c(xmin = MAP_XLIM[1] - 500, xmax = MAP_XLIM[2] + 500,
+                                ymin = MAP_YLIM[1] - 500, ymax = MAP_YLIM[2] + 500),
+                              crs = st_crs(LAEA)))
+
+# Crop in lon/lat first (two boxes either side of the 180° meridian), then project
+prep_layer <- function(x) {
+  x <- st_make_valid(st_transform(x, 4326))
+  boxes <- list(st_bbox(c(xmin = 120, xmax = 180, ymin = 10, ymax = 75), crs = 4326),
+                st_bbox(c(xmin = -180, xmax = -90, ymin = 10, ymax = 75), crs = 4326))
+  parts <- lapply(boxes, function(b) suppressWarnings(st_crop(x, b)))
+  out <- do.call(rbind, lapply(parts, function(p) p[, attr(p, "sf_column")]))
+  out <- st_make_valid(st_transform(out, LAEA))
+  suppressWarnings(st_intersection(out, crop_box))
+}
+
+coast_file <- NULL
+for (res in c("i", "h", "f", "l")) {
+  f <- file.path(GSHHS_DIR, res, paste0("GSHHS_", res, "_L1.shp"))
+  if (file.exists(f)) { coast_file <- f; break }
+}
+coast <- tryCatch({
+  if (!is.null(coast_file)) prep_layer(st_read(coast_file, quiet = TRUE))
+  else if (requireNamespace("rnaturalearth", quietly = TRUE))
+    prep_layer(rnaturalearth::ne_countries(scale = 50, returnclass = "sf"))
+  else NULL
+}, error = function(e) { message("Coastline not drawn: ", conditionMessage(e)); NULL })
+iso200 <- tryCatch(if (file.exists(ISO200_FILE)) prep_layer(st_read(ISO200_FILE, quiet = TRUE)) else NULL,
+                   error = function(e) { message("Isobath not drawn: ", conditionMessage(e)); NULL })
+colony_sf <- st_transform(st_sfc(st_point(COLONY_LONLAT), crs = 4326), LAEA)
+
+# Map furniture drawn ON TOP of the data layers (isobath, land, colony), plus projection and theme
+base_layers <- function() list(
+  if (!is.null(iso200)) geom_sf(data = iso200, colour = "grey60", linewidth = 0.25, inherit.aes = FALSE),
+  if (!is.null(coast))  geom_sf(data = coast, fill = "grey75", colour = "grey55", linewidth = 0.1,
+                                inherit.aes = FALSE),
+  geom_sf(data = colony_sf, shape = 23, fill = "darkorange3", colour = "black", size = 3,
+          inherit.aes = FALSE),
+  coord_sf(crs = st_crs(LAEA), xlim = MAP_XLIM, ylim = MAP_YLIM, expand = FALSE,
+           datum = st_crs(4326)),
+  theme_bw(),
+  theme(panel.background = element_rect(fill = "aliceblue"),
+        panel.grid.major = element_line(colour = "grey85", linewidth = 0.2)),
+  labs(x = NULL, y = NULL))
+```
+
+## Utilisation distributions
+
+One kernel UD per seal (Gaussian kernel, common bandwidth, common grid);
+each column of `P` sums to 1.
+
+```{r ud-functions}
+# MASS::kde2d uses a Gaussian kernel with sd = h / 4
+ud_individual <- function(trk, sd_km) {
+  ids <- unique(trk$TOPPID)
+  P <- sapply(ids, function(id) {
+    tr <- trk[trk$TOPPID == id, ]
+    z  <- as.vector(MASS::kde2d(tr$x, tr$y, h = 4 * sd_km, n = c(nx, ny), lims = lims)$z)
+    z / sum(z)
+  })
+  colnames(P) <- ids
+  P
+}
+# Cumulative-probability "volume" surface: cells with vol <= 0.5 form the 50% UD
+iso_vol <- function(p) { o <- order(p, decreasing = TRUE); v <- numeric(length(p)); v[o] <- cumsum(p[o]); v }
+in_isopleth <- function(p, level) iso_vol(p) <= level
+udoi <- function(p1, p2, level = 0.95) {
+  a <- in_isopleth(p1, level) & in_isopleth(p2, level)
+  sum(a) * sum(p1[a] * p2[a])
+}
+strategy_uds <- function(P, strat) {
+  sapply(levels(strat), function(s) rowMeans(P[, strat == s, drop = FALSE]))
+}
+# UD-weighted mean of a per-seal value in each cell, masked where few seals or outside the population UD
+weighted_map <- function(P, value, pop_mask, min_neff = MIN_NEFF) {
+  s1 <- rowSums(P); s2 <- rowSums(P^2)
+  neff <- ifelse(s2 > 0, s1^2 / s2, 0)
+  m <- drop(P %*% value) / s1
+  m[!pop_mask | neff < min_neff] <- NA
+  data.frame(grid, value = m, neff = neff)
+}
+```
+
+```{r ud-estimate}
+trk_pb <- tracks %>% filter(trip == "PB")
+trk_pm <- tracks %>% filter(trip == "PM")
+P_pb <- ud_individual(trk_pb, KERNEL_SD_KM)
+P_pm <- ud_individual(trk_pm, KERNEL_SD_KM)
+seals_pb <- seals %>% filter(trip == "PB") %>% slice(match(colnames(P_pb), TOPPID))
+seals_pm <- seals %>% filter(trip == "PM") %>% slice(match(colnames(P_pm), TOPPID))
+stopifnot(identical(seals_pb$TOPPID, colnames(P_pb)), identical(seals_pm$TOPPID, colnames(P_pm)))
+```
+
+# Post-Breeding strategies
+
+```{r pb-uds}
+strat_pb <- factor(seals_pb$strategy, levels = intersect(names(STRAT_COLS), unique(seals_pb$strategy)))
+U_pb <- strategy_uds(P_pb, strat_pb)
+n_pb <- table(strat_pb)
+lab_pb <- setNames(paste0(names(n_pb), " (n = ", n_pb, ")"), names(n_pb))
+
+ud_long_pb <- bind_rows(lapply(colnames(U_pb), function(s)
+  data.frame(grid, strategy = s, p = U_pb[, s], vol = iso_vol(U_pb[, s])))) %>%
+  mutate(strategy = factor(strategy, levels(strat_pb)))
+```
+
+## Map: core areas and ranges
+
+Filled areas: 50 % UD (core). Lines: 95 % UD. Strategies with fewer than
+`SMALL_N` seals are also shown as individual tracks, which are more honest
+than a smoothed surface for very small samples.
+
+```{r pb-map-overlay, fig.height = 6.5}
+small <- names(n_pb)[n_pb < SMALL_N]
+g_pb <- ggplot() +
+  geom_path(data = trk_pb %>% filter(strategy %in% small),
+            aes(x, y, group = TOPPID, colour = strategy), linewidth = 0.25, alpha = 0.6) +
+  geom_tile(data = ud_long_pb %>% filter(vol <= 0.5),
+            aes(x, y, fill = strategy), width = cell_w, height = cell_h, alpha = 0.55) +
+  geom_contour(data = ud_long_pb, aes(x, y, z = vol, colour = strategy),
+               breaks = 0.95, linewidth = 0.7) +
+  base_layers() +
+  scale_fill_manual(values = STRAT_COLS, labels = lab_pb, name = "Strategy") +
+  scale_colour_manual(values = STRAT_COLS, labels = lab_pb, name = "Strategy") +
+  labs(title = "Post-Breeding foraging strategies",
+       caption = sprintf("Filled: 50%% UD; line: 95%% UD; kernel sd = %d km; equal weight per seal",
+                         KERNEL_SD_KM))
+g_pb
+ggsave(file.path(FIG, "PB_strategy_UDs_overlay.pdf"), g_pb, width = 9, height = 6.5, device = cairo_pdf)
+```
+
+```{r pb-map-panels, fig.height = 4.5, fig.width = 12}
+bands <- function(v) cut(v, c(0, 0.25, 0.5, 0.75, 0.95), labels = c("25%", "50%", "75%", "95%"))
+g_pbp <- ggplot() +
+  geom_tile(data = ud_long_pb %>% filter(vol <= 0.95) %>% mutate(band = bands(vol)),
+            aes(x, y, fill = band), width = cell_w, height = cell_h) +
+  geom_path(data = trk_pb %>% filter(strategy %in% small),
+            aes(x, y, group = TOPPID), colour = "grey20", linewidth = 0.2, alpha = 0.5) +
+  base_layers() +
+  facet_wrap(~ strategy, nrow = 1, labeller = as_labeller(lab_pb)) +
+  scale_fill_brewer(palette = "YlOrRd", direction = -1, name = "UD isopleth") +
+  labs(title = "Post-Breeding strategies: utilisation distributions")
+g_pbp
+ggsave(file.path(FIG, "PB_strategy_UDs_panels.pdf"), g_pbp, width = 13, height = 4.5, device = cairo_pdf)
+```
+
+## Overlap between strategies
+
+Bhattacharyya's affinity (BA; 0 = no overlap, 1 = identical) and UDOI on the
+95 % UDs (Fieberg & Kochanny 2005). Because the strategies were defined partly
+from spatial variables, low overlap is expected: these are descriptions of the
+strategies, not independent tests.
+
+```{r pb-overlap}
+BA_pb   <- crossprod(sqrt(U_pb))
+UDOI_pb <- outer(colnames(U_pb), colnames(U_pb), Vectorize(function(a, b) udoi(U_pb[, a], U_pb[, b])))
+dimnames(UDOI_pb) <- dimnames(BA_pb)
+round(BA_pb, 3); round(UDOI_pb, 3)
+write.csv(round(BA_pb, 4), file.path(OUT, "PB_overlap_BA.csv"))
+write.csv(round(UDOI_pb, 4), file.path(OUT, "PB_overlap_UDOI95.csv"))
+
+# Bandwidth sensitivity of between-strategy BA
+pair_names <- combn(colnames(U_pb), 2, paste, collapse = " - ")
+ba_sens <- sapply(KERNEL_SD_SENS, function(h) {
+  Pb <- if (h == KERNEL_SD_KM) P_pb else ud_individual(trk_pb, h)
+  B <- crossprod(sqrt(strategy_uds(Pb, strat_pb)))
+  B[upper.tri(B)]
+})
+ba_sens <- matrix(ba_sens, ncol = length(KERNEL_SD_SENS),
+                  dimnames = list(pair_names, paste0("sd_", KERNEL_SD_SENS, "km")))
+round(ba_sens, 3)
+
+# Individual-level overlap: do seals of the same strategy share space more than seals of different strategies?
+BAi <- crossprod(sqrt(P_pb))
+pr <- which(upper.tri(BAi), arr.ind = TRUE)
+ind_ba <- data.frame(s1 = as.character(strat_pb[pr[, 1]]), s2 = as.character(strat_pb[pr[, 2]]),
+                     BA = BAi[pr]) %>%
+  mutate(pair = ifelse(s1 == s2, paste0(s1, " (within)"),
+                       paste(pmin(s1, s2), pmax(s1, s2), sep = " - ")))
+ind_tab <- ind_ba %>% group_by(pair) %>%
+  summarise(n_pairs = n(), median_BA = median(BA), q25 = quantile(BA, .25), q75 = quantile(BA, .75))
+ind_tab %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(ind_tab, file.path(OUT, "PB_individual_overlap.csv"), row.names = FALSE)
+
+# Size of core and range (km2) per strategy
+area_tab <- data.frame(strategy = colnames(U_pb),
+  n = as.vector(n_pb[colnames(U_pb)]),
+  core50_km2 = colSums(apply(U_pb, 2, in_isopleth, 0.5)) * cell_w * cell_h,
+  range95_km2 = colSums(apply(U_pb, 2, in_isopleth, 0.95)) * cell_w * cell_h)
+area_tab
+write.csv(area_tab, file.path(OUT, "PB_UD_areas.csv"), row.names = FALSE)
+```
+
+# Post-Moult: mapping the continuum
+
+Post-moult behaviour varies continuously, so the maps show **where seals at
+different positions on the behavioural gradient forage**, rather than group
+polygons. Each grid cell shows the UD-weighted mean score of the seals using
+it; cells outside the population 95 % UD or used by fewer than `MIN_NEFF`
+"effective" seals are left blank. The 50 % UDs of the two Post-Moult modes are
+drawn as thin dashed lines for reference only.
+
+```{r pm-setup}
+pop_pm  <- rowMeans(P_pm)
+mask_pm <- in_isopleth(pop_pm, POP_MASK)
+sc_pm   <- pm_scores[match(colnames(P_pm), pm_scores$TOPPID), ]
+stopifnot(identical(sc_pm$TOPPID, colnames(P_pm)))
+
+strat_pm <- factor(seals_pm$strategy, levels = intersect(names(STRAT_COLS), unique(seals_pm$strategy)))
+U_pm <- strategy_uds(P_pm, strat_pm)
+modes_pm <- bind_rows(lapply(colnames(U_pm), function(s)
+  data.frame(grid, strategy = s, vol = iso_vol(U_pm[, s]))))
+
+gradient_map <- function(value, title, fill_scale) {
+  wm <- weighted_map(P_pm, value, mask_pm) %>% filter(!is.na(value))
+  ggplot() +
+      geom_tile(data = wm, aes(x, y, fill = value), width = cell_w, height = cell_h) +
+    geom_contour(data = modes_pm, aes(x, y, z = vol, group = strategy),
+                 breaks = 0.5, colour = "grey15", linewidth = 0.3, linetype = 2) +
+    base_layers() +
+    fill_scale + labs(title = title)
+}
+```
+
+```{r pm-gradient-maps, fig.height = 6.5}
+lim1 <- max(abs(sc_pm$Dim1)); lim2 <- max(abs(sc_pm$Dim2))
+g_d1 <- gradient_map(sc_pm$Dim1,
+  sprintf("Post-Moult gradient, Dim 1 (positive = higher %s)", ORIENT[["Dim1"]]),
+  scale_fill_distiller(palette = "RdBu", limits = c(-lim1, lim1), name = "Dim 1 score"))
+g_d2 <- gradient_map(sc_pm$Dim2,
+  sprintf("Post-Moult gradient, Dim 2 (positive = higher %s)", ORIENT[["Dim2"]]),
+  scale_fill_distiller(palette = "RdBu", limits = c(-lim2, lim2), name = "Dim 2 score"))
+g_cac <- gradient_map(sc_pm$CAC, "Post-Moult: California Current use",
+  scale_fill_viridis_c(name = "Proportion of\ntrip in CAC"))
+g_d1; g_d2; g_cac
+ggsave(file.path(FIG, "PM_gradient_Dim1.pdf"), g_d1, width = 9, height = 6.5, device = cairo_pdf)
+ggsave(file.path(FIG, "PM_gradient_Dim2.pdf"), g_d2, width = 9, height = 6.5, device = cairo_pdf)
+ggsave(file.path(FIG, "PM_gradient_CAC.pdf"), g_cac, width = 9, height = 6.5, device = cairo_pdf)
+```
+
+## Each seal's foraging centroid
+
+The UD-weighted centroid of each seal, coloured by its gradient score. A
+continuum appears as a smooth colour change across space rather than two
+separated clouds.
+
+```{r pm-centroids, fig.height = 6.5}
+cent_pm <- data.frame(TOPPID = colnames(P_pm),
+                      x = drop(crossprod(P_pm, grid$x)), y = drop(crossprod(P_pm, grid$y))) %>%
+  left_join(sc_pm, by = "TOPPID") %>%
+  left_join(seals_pm %>% dplyr::select(TOPPID, strategy), by = "TOPPID")
+g_cent <- ggplot() +
+  geom_point(data = cent_pm, aes(x, y, fill = Dim1, shape = strategy), size = 3, colour = "grey20") +
+  base_layers() +
+  scale_fill_distiller(palette = "RdBu", limits = c(-lim1, lim1), name = "Dim 1 score") +
+  scale_shape_manual(values = c(21, 24, 22), name = "Mode") +
+  labs(title = "Post-Moult: foraging centroids coloured by gradient score")
+g_cent
+ggsave(file.path(FIG, "PM_centroids_Dim1.pdf"), g_cent, width = 9, height = 6.5, device = cairo_pdf)
+write.csv(cent_pm, file.path(OUT, "PM_centroids_scores.csv"), row.names = FALSE)
+```
+
+## Reference: the Post-Moult modes as UDs
+
+For comparison with the Post-Breeding map only (same symbology). Present the
+gradient maps as the main result.
+
+```{r pm-modes, fig.height = 6.5}
+n_pm <- table(strat_pm); lab_pm <- setNames(paste0(names(n_pm), " (n = ", n_pm, ")"), names(n_pm))
+ud_long_pm <- modes_pm %>% mutate(strategy = factor(strategy, levels(strat_pm)))
+g_pmm <- ggplot() +
+  geom_tile(data = ud_long_pm %>% filter(vol <= 0.5), aes(x, y, fill = strategy),
+            width = cell_w, height = cell_h, alpha = 0.55) +
+  geom_contour(data = ud_long_pm, aes(x, y, z = vol, colour = strategy), breaks = 0.95, linewidth = 0.7) +
+  base_layers() +
+  scale_fill_manual(values = STRAT_COLS, labels = lab_pm, name = "Mode") +
+  scale_colour_manual(values = STRAT_COLS, labels = lab_pm, name = "Mode") +
+  labs(title = "Post-Moult modes (reference only)")
+g_pmm
+ggsave(file.path(FIG, "PM_mode_UDs_reference.pdf"), g_pmm, width = 9, height = 6.5, device = cairo_pdf)
+
+BA_pm <- crossprod(sqrt(U_pm)); round(BA_pm, 3)
+write.csv(round(BA_pm, 4), file.path(OUT, "PM_modes_overlap_BA.csv"))
+```
+
+# Isotope maps
+
+UD-weighted mean δ¹³C and δ¹⁵N of the seals using each cell, for both trips,
+on a common colour scale per isotope. These link the spatial patterns to the
+isotope results (enrichment where California Current use is high). Isotopes
+integrate diet over a period that may not match the tracked trip exactly, and
+the maps show where enriched seals forage, not an isoscape.
+
+```{r iso-maps, fig.height = 5, fig.width = 13}
+iso_map_df <- function(P, trip_code) {
+  v <- iso_dat %>% filter(trip == trip_code)
+  v <- v[match(colnames(P), v$TOPPID), ]
+  pop_mask <- in_isopleth(rowMeans(P), POP_MASK)
+  bind_rows(lapply(ISO, function(i) {
+    ok <- !is.na(v[[i]])
+    weighted_map(P[, ok, drop = FALSE], v[[i]][ok], pop_mask) %>% mutate(isotope = i)
+  })) %>% mutate(trip = recode(trip_code, PB = "Post-Breeding", PM = "Post-Moult"))
+}
+iso_maps <- bind_rows(iso_map_df(P_pb, "PB"), iso_map_df(P_pm, "PM")) %>% filter(!is.na(value))
+
+for (i in ISO) {
+  g <- ggplot() +
+      geom_tile(data = iso_maps %>% filter(isotope == i), aes(x, y, fill = value),
+              width = cell_w, height = cell_h) +
+    base_layers() +
+    facet_wrap(~ trip, nrow = 1) +
+    scale_fill_viridis_c(option = "magma", name = paste(i, "(‰)")) +
+    labs(title = paste("UD-weighted mean", i))
+  print(g)
+  ggsave(file.path(FIG, paste0("Isotope_map_", i, ".pdf")), g, width = 13, height = 5, device = cairo_pdf)
+}
+```
+
+# Save
+
+```{r save}
+saveRDS(list(grid = grid, lims = lims, crs = LAEA, kernel_sd_km = KERNEL_SD_KM,
+             P_pb = P_pb, P_pm = P_pm, seals_pb = seals_pb, seals_pm = seals_pm,
+             U_pb = U_pb, U_pm = U_pm, pm_scores = sc_pm),
+        file.path(OUT, "spatial_UDs.rds"))
+sessionInfo()
+```
+
+# Suggested Methods text
+
+*Space use was estimated from 6-hourly locations, excluding locations within
+100 km of the colony. For each trip we estimated a utilisation distribution
+(UD) with a Gaussian kernel (standard deviation 50 km; 25 and 100 km as
+sensitivity) on a common 25-km grid in a Lambert azimuthal equal-area
+projection. Strategy UDs were the average of their members' individual UDs, so
+each seal contributed equally regardless of track length; we report 50 % (core)
+and 95 % isopleths. Overlap between strategies was quantified with
+Bhattacharyya's affinity and the utilisation distribution overlap index (UDOI)
+of the 95 % UDs (Fieberg & Kochanny 2005). For the post-moult trip, where
+behaviour varied continuously, we mapped the UD-weighted mean score on the
+behavioural gradient (principal components) in each grid cell, restricted to
+cells within the population 95 % UD and used by at least three effective
+individuals.*
