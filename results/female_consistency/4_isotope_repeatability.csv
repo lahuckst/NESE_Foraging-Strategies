@@ -1,0 +1,7 @@
+"variable","n_obs","n_females","n_repeat_females","R","lwr","upr","P_LRT","P_permut"
+"d13C (a) repeat females, no year",109,47,47,NA,NA,NA,NA,NA
+"d13C (b) all females, no year",259,197,47,NA,NA,NA,NA,NA
+"d13C (c) all females, year random",259,197,47,NA,NA,NA,NA,NA
+"d15N (a) repeat females, no year",109,47,47,NA,NA,NA,NA,NA
+"d15N (b) all females, no year",259,197,47,NA,NA,NA,NA,NA
+"d15N (c) all females, year random",259,197,47,NA,NA,NA,NA,NA

@@ -1,0 +1,6 @@
+"variable","n_obs","n_females","n_repeat_females","R","lwr","upr","P_LRT","P_permut"
+"Dim 1 (latitude / offshore axis)",179,157,17,NA,NA,NA,NA,NA
+"Dim 2 (California Current axis)",179,157,17,NA,NA,NA,NA,NA
+"Maximum latitude",179,157,17,NA,NA,NA,NA,NA
+"California Current use (logit)",179,157,17,NA,NA,NA,NA,NA
+"Distance to shelf (log)",179,157,17,NA,NA,NA,NA,NA
