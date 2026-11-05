@@ -1,9 +1,0 @@
-"response","covariates","n","F","p_perm","term","p_BH"
-"d13C","Dim2 + Dim3 + Dim4 + ProcedureYear",86,5.80045041988569,0.0166,"Dim1",0.0332
-"d13C","Dim1 + Dim3 + Dim4 + ProcedureYear",86,30.4002947907439,2e-04,"Dim2",8e-04
-"d13C","Dim1 + Dim2 + Dim4 + ProcedureYear",86,0.000686309348809407,0.98,"Dim3",0.98
-"d13C","Dim1 + Dim2 + Dim3 + ProcedureYear",86,4.98377164701748,0.0306,"Dim4",0.04896
-"d15N","Dim2 + Dim3 + Dim4 + ProcedureYear",86,6.93385516896911,0.0084,"Dim1",0.0224
-"d15N","Dim1 + Dim3 + Dim4 + ProcedureYear",86,47.9389956124752,2e-04,"Dim2",8e-04
-"d15N","Dim1 + Dim2 + Dim4 + ProcedureYear",86,0.0925790688507017,0.7636,"Dim3",0.872685714285714
-"d15N","Dim1 + Dim2 + Dim3 + ProcedureYear",86,0.136338047749541,0.711,"Dim4",0.872685714285714
