@@ -1,0 +1,589 @@
+---
+title: "NESE males: isotopic structure, niche and repeatability"
+author: "Luis Huckstadt"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.align = "center", fig.width = 7, fig.height = 4.5)
+```
+
+# Overview
+
+Males have stable isotope values (δ¹³C, δ¹⁵N) and standard length, but no
+tracking or diving data. This script asks the same questions as the female
+analyses, with methods suited to those data. It replaces
+`NESE_NicheWidth_PostBreeding_Males.Rmd`, `NESE_NicheWidth_Males_PB.Rmd` and
+`NESE_MaleRepeatabilityIsotopes.Rmd`.
+
+1. **Are there discrete isotopic groups?** Gaussian mixture models with
+   correlated isotopes (1–4 groups, including "no groups"), a bootstrap
+   likelihood-ratio test, and a null-model test of cluster structure.
+2. **The isotopic gradient.** Each male's position along the main axis of
+   isotopic variation.
+3. **What explains isotopic position?** Standard length, trip type and year.
+   Length is tested as an explanation rather than used to define groups.
+4. **Isotopic niche.** Niche size and directional overlap of males compared
+   with each female strategy (nicheROVER and SIBER), with a sensitivity
+   analysis restricted to females sampled in the same years as males.
+5. **Repeatability.** Population-level repeatability and within-male
+   differences compared with differences between males sampled in the same
+   years (exploratory: few repeat males).
+
+**Why the previous approach was replaced.** Clustering on δ¹³C, δ¹⁵N and
+length made groups partly size classes; `na.omit()` removed the males without
+length, leaving 13 post-breeding males for three clusters; isotopic niches of
+clusters defined by the same isotopes overlap little by construction; niches
+were estimated in three dimensions from 3–7 males with an unseeded random prior;
+and the repeatability script shared the problems of the female version
+(per-individual index, mislabelled IDs, hard-coded rows).
+
+**Run first:** `NESE_PB_ForagingStrategies.Rmd` and
+`NESE_PM_ForagingStrategies.Rmd` (female strategies, for the sex comparison).
+
+```{r libraries}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(cluster)      # silhouette
+library(nicheROVER)
+library(rptR)
+library(lme4)
+# mclust and MASS are called with :: (attaching them masks dplyr functions)
+```
+
+# Settings
+
+```{r settings}
+SEED <- 20261105
+set.seed(SEED)
+
+META_FILE <- "../data/IsotopesDatasetForLuis_2023_4_4.csv"
+PB_ASSIGN <- "../results/PB_strategies/A_strategy_assignments.csv"
+PM_ASSIGN <- "../results/PM_strategies/A_strategy_assignments.csv"
+
+N_BOOT_LRT <- 999    # bootstrap replicates for the mixture-model LRT
+N_NULL     <- 500    # simulations for the cluster-structure null model
+N_PERM     <- 9999   # permutations
+N_POST     <- 1e4    # nicheROVER posterior draws
+N_RPT_BOOT <- 1000   # rptR bootstrap replicates
+N_RPT_PERM <- 1000   # rptR permutations
+MIN_GROUP_N <- 5     # smallest group used in niche comparisons
+
+# SIBER (needs JAGS; section skipped if not installed)
+SIBER_PARMS  <- list(n.iter = 2e4, n.burnin = 1e3, n.thin = 10, n.chains = 2)
+SIBER_PRIORS <- list(R = 1 * diag(2), k = 2, tau.mu = 1.0E-3)
+SIBER_DRAWS  <- 500
+SIBER_P      <- 0.95
+HAS_SIBER <- requireNamespace("SIBER", quietly = TRUE) && requireNamespace("rjags", quietly = TRUE)
+if (!HAS_SIBER) message("SIBER/rjags (JAGS) not available: the SIBER section will be skipped.")
+
+OUT <- "../results/males"
+FIG <- "../figures/males"
+dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
+dir.create(FIG, recursive = TRUE, showWarnings = FALSE)
+
+ISO <- c("d13C", "d15N")
+TRIP_LAB <- c(PostBreeding = "PB", PostMolt = "PM")
+GROUP_COLS <- c("Males"                      = "#d73027",
+                "Females PB: Subarctic"      = "#1b9e77",
+                "Females PB: N Central Pacific" = "#d95f02",
+                "Females PB: California Current" = "#7570b3",
+                "Females PM"                 = "grey45")
+```
+
+## Helper functions
+
+```{r helpers}
+pick1 <- function(x) x[sample.int(length(x), 1)]
+
+# Ward + k-means consolidation (as FactoMineR::HCPC)
+hcpc_lite <- function(S, k) {
+  cl  <- cutree(hclust(dist(S), method = "ward.D2"), k)
+  cen <- apply(S, 2, function(x) tapply(x, cl, mean))
+  tryCatch(kmeans(S, centers = cen, iter.max = 100)$cluster, error = function(e) cl)
+}
+
+# Freedman-Lane permutation F test for `term`, adjusting for `covars`
+fl_test <- function(d, response, term, covars = character(0), B = N_PERM) {
+  v  <- c(response, term, covars)
+  d  <- d[complete.cases(d[v]), v, drop = FALSE]
+  X0 <- model.matrix(reformulate(if (length(covars)) covars else "1"), d)
+  X1 <- model.matrix(reformulate(c(covars, term)), d)
+  y  <- d[[response]]
+  Fstat <- function(y) {
+    m0 <- lm.fit(X0, y); m1 <- lm.fit(X1, y)
+    r0 <- sum(m0$residuals^2); r1 <- sum(m1$residuals^2)
+    ((r0 - r1) / (m1$rank - m0$rank)) / (r1 / (nrow(X1) - m1$rank))
+  }
+  F_obs <- Fstat(y)
+  m0 <- lm.fit(X0, y); fit0 <- y - m0$residuals
+  F_p <- replicate(B, Fstat(fit0 + sample(m0$residuals)))
+  data.frame(response = response, term = term,
+             covariates = if (length(covars)) paste(covars, collapse = " + ") else "none",
+             n = nrow(d), F = F_obs, p_perm = (1 + sum(F_p >= F_obs)) / (B + 1))
+}
+
+# rptR without progress bars, and results read from its printed summary
+fit_rpt <- function(...) { out <- NULL; invisible(capture.output(out <- rpt(...))); out }
+rpt_parse <- function(r, comp) {
+  txt <- capture.output(print(summary(r)))
+  i <- grep(paste0("^\\s*", comp, " \\("), txt)[1]
+  if (is.na(i)) return(NULL)
+  k <- grep("Repeatability estimation overview", txt); k <- k[k > i][1]
+  if (is.na(k)) return(NULL)
+  hdr  <- strsplit(trimws(txt[k + 1]), "\\s+")[[1]]
+  vals <- suppressWarnings(as.numeric(strsplit(trimws(txt[k + 2]), "\\s+")[[1]]))
+  if (length(hdr) != length(vals)) return(NULL)
+  setNames(vals, hdr)
+}
+rpt_row <- function(r, label, n_obs, n_ind, n_rep) {
+  v <- if (is.null(r)) NULL else rpt_parse(r, "MainID")
+  g <- function(x, nm) if (!is.null(x) && nm %in% names(x)) unname(x[[nm]]) else NA_real_
+  if (is.null(v) && !is.null(r)) { message("Could not read R for ", label); print(summary(r)) }
+  data.frame(variable = label, n_obs = n_obs, n_males = n_ind, n_repeat_males = n_rep,
+             R = g(v, "R"), SE = g(v, "SE"), lwr = g(v, "2.5%"), upr = g(v, "97.5%"),
+             P_LRT = g(v, "LRT_P"), P_permut = g(v, "P_permut"))
+}
+
+# All within-individual pairs of samples
+within_pairs <- function(d) {
+  d %>% group_by(MainID) %>% filter(n() > 1) %>%
+    group_modify(function(g, key) {
+      ij <- t(combn(nrow(g), 2))
+      data.frame(row_1 = g$row[ij[, 1]], row_2 = g$row[ij[, 2]],
+                 trip_1 = g$trip[ij[, 1]], trip_2 = g$trip[ij[, 2]],
+                 year_1 = g$year[ij[, 1]], year_2 = g$year[ij[, 2]])
+    }) %>% ungroup() %>% mutate(lag_years = abs(year_2 - year_1))
+}
+```
+
+# Data
+
+```{r data}
+meta <- read.csv(META_FILE)
+
+males <- meta %>%
+  filter(Sex == "Male", TimePeriod == "Arrival", !is.na(d13C), !is.na(d15N)) %>%
+  transmute(MainID = as.character(MainID), TOPPID = as.character(TOPPID),
+            trip = unname(TRIP_LAB[as.character(Trip)]), year = as.integer(ProcedureYear),
+            length_cm = StandardLength_cm, d13C, d15N) %>%
+  filter(!is.na(trip)) %>%
+  arrange(year, trip) %>% mutate(row = row_number(), Trip = factor(trip), Year = factor(year))
+
+cat(nrow(males), "samples from", n_distinct(males$MainID), "males;",
+    sum(table(males$MainID) > 1), "males sampled more than once\n")
+table(males$trip, males$year)
+cat("Samples without standard length:", sum(is.na(males$length_cm)), "\n")
+
+# One sample per male (earliest) for analyses that assume independent individuals
+males1 <- males %>% distinct(MainID, .keep_all = TRUE)
+
+# Females: tracked strategies with isotopes
+fem_iso <- meta %>% transmute(TOPPID = as.character(TOPPID), d13C, d15N) %>% distinct(TOPPID, .keep_all = TRUE)
+females <- bind_rows(
+  read.csv(PB_ASSIGN) %>% transmute(TOPPID = as.character(TOPPID), MainID = as.character(MainID),
+                                    year = ProcedureYear, trip = "PB",
+                                    group = paste("Females PB:", recode(strategy,
+                                      "North Central Pacific" = "N Central Pacific"))),
+  read.csv(PM_ASSIGN) %>% transmute(TOPPID = as.character(TOPPID), MainID = as.character(MainID),
+                                    year = ProcedureYear, trip = "PM", group = "Females PM")) %>%
+  left_join(fem_iso, by = "TOPPID") %>% filter(!is.na(d13C), !is.na(d15N))
+table(females$group)
+
+g <- ggplot() +
+  geom_point(data = females, aes(d13C, d15N, colour = group), alpha = 0.5, size = 1.6) +
+  geom_point(data = males, aes(d13C, d15N, colour = "Males", shape = trip), size = 2.4) +
+  scale_colour_manual(values = GROUP_COLS, name = NULL) +
+  scale_shape_manual(values = c(PB = 16, PM = 17), name = "Male trip") +
+  theme_bw() + labs(x = "δ¹³C (‰)", y = "δ¹⁵N (‰)")
+g
+ggsave(file.path(FIG, "0_males_vs_female_strategies.pdf"), g, width = 8, height = 5, device = cairo_pdf)
+```
+
+# 1. Are there discrete isotopic groups?
+
+## Gaussian mixture models
+
+δ¹³C and δ¹⁵N are strongly correlated, so models must allow correlated
+(ellipsoidal) groups; models that assume uncorrelated isotopes can split one
+elongated cloud into spurious groups. Models with 1–4 groups are compared by
+BIC (higher is better in `mclust`); one group means no discrete structure.
+
+```{r mixture}
+Z1 <- scale(males1[ISO])
+cor(males1$d13C, males1$d15N, method = "spearman")
+
+bic1 <- mclust::mclustBIC(Z1, G = 1:4)
+summary(bic1)
+plot(bic1)
+
+# Best model among those allowing correlated isotopes (full covariance)
+full_models <- c("EEE", "VVV", "EEV", "VEV", "EVE", "VVE", "EVV", "VEE")
+bic_full <- bic1[, intersect(full_models, colnames(bic1)), drop = FALSE]
+best <- which(bic_full == max(bic_full, na.rm = TRUE), arr.ind = TRUE)[1, ]
+cat("Best correlated model:", colnames(bic_full)[best[2]], "with G =", rownames(bic_full)[best[1]], "\n")
+round(bic_full, 1)
+
+# Sensitivity: all samples
+bic_all <- mclust::mclustBIC(scale(males[ISO]), G = 1:4)
+summary(bic_all)
+```
+
+## Bootstrap likelihood-ratio test (1 vs 2 vs 3 groups)
+
+```{r mixture-lrt}
+set.seed(SEED)
+lrt <- mclust::mclustBootstrapLRT(Z1, modelName = "VVV", nboot = N_BOOT_LRT, maxG = 2, verbose = FALSE)
+lrt
+```
+
+## Null-model test of cluster structure
+
+The silhouette of Ward + k-means clusters is compared with that obtained from
+data simulated from a single bivariate normal distribution with the observed
+means and covariance (one correlated cloud, no groups).
+
+```{r null-structure}
+mu <- colMeans(Z1); Sg <- cov(Z1)
+set.seed(SEED)
+null_struct <- do.call(rbind, lapply(2:4, function(k) {
+  obs <- mean(silhouette(hcpc_lite(Z1, k), dist(Z1))[, 3])
+  sim <- replicate(N_NULL, {
+    Y <- MASS::mvrnorm(nrow(Z1), mu, Sg)
+    mean(silhouette(hcpc_lite(Y, k), dist(Y))[, 3])
+  })
+  data.frame(k = k, silhouette = obs, null_median = median(sim),
+             null_95 = quantile(sim, 0.95), p = (1 + sum(sim >= obs)) / (N_NULL + 1))
+}))
+rownames(null_struct) <- NULL
+null_struct %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(null_struct, file.path(OUT, "1_null_structure.csv"), row.names = FALSE)
+```
+
+**Interpretation.** Discrete groups are supported only if a correlated mixture
+model with ≥ 2 groups clearly beats one group (ΔBIC > 6), the bootstrap LRT
+rejects one group, and the silhouette exceeds the null. Otherwise, describe
+male isotopes as a continuum (Section 2).
+
+# 2. The isotopic gradient
+
+The first principal component of the standardised isotopes summarises the main
+axis of variation; positive scores = higher δ¹³C (and δ¹⁵N), i.e. more coastal /
+continental-margin values; negative = more oceanic.
+
+```{r gradient}
+pca_iso <- prcomp(males[ISO], center = TRUE, scale. = TRUE)
+males$gradient <- pca_iso$x[, 1] * sign(cor(pca_iso$x[, 1], males$d13C))
+summary(pca_iso)$importance[, 1]
+round(pca_iso$rotation, 2)
+
+if (requireNamespace("diptest", quietly = TRUE)) {
+  print(diptest::dip.test(males$gradient[!duplicated(males$MainID)]))
+} else message("Install 'diptest' for a formal test of unimodality.")
+
+g <- ggplot(males %>% distinct(MainID, .keep_all = TRUE), aes(gradient)) +
+  geom_histogram(bins = 15, fill = "#d73027", colour = "white") + theme_bw() +
+  labs(x = "Isotopic gradient score (PC1; + = higher δ¹³C and δ¹⁵N)",
+       y = "Number of males")
+g
+ggsave(file.path(FIG, "2_gradient_distribution.pdf"), g, width = 7, height = 4, device = cairo_pdf)
+write.csv(males, file.path(OUT, "2_males_with_gradient.csv"), row.names = FALSE)
+```
+
+# 3. What explains isotopic position?
+
+One sample per male (earliest with length data). Each term is tested with
+Freedman–Lane permutation tests adjusting for the others.
+
+```{r explain}
+ml <- males %>% filter(!is.na(length_cm)) %>% distinct(MainID, .keep_all = TRUE)
+cat(nrow(ml), "males with standard length\n")
+set.seed(SEED)
+expl <- bind_rows(lapply(c(ISO, "gradient"), function(v) bind_rows(
+  fl_test(ml, v, "length_cm", c("Trip", "Year")),
+  fl_test(ml, v, "Trip",      c("length_cm", "Year")),
+  fl_test(ml, v, "Year",      c("length_cm", "Trip")))))
+expl$p_BH <- p.adjust(expl$p_perm, "BH")
+expl %>% mutate(across(c(F, p_perm, p_BH), ~ signif(.x, 3)))
+write.csv(expl, file.path(OUT, "3_explanatory_tests.csv"), row.names = FALSE)
+
+# Slopes per 10 cm of length
+sapply(setNames(ISO, ISO), function(v) {
+  f <- lm(reformulate(c("length_cm", "Trip", "Year"), v), data = ml)
+  round(c(slope_per_10cm = 10 * coef(f)[["length_cm"]], 10 * confint(f)["length_cm", ]), 3)
+})
+
+g <- ml %>% pivot_longer(all_of(ISO), names_to = "isotope") %>%
+  ggplot(aes(length_cm, value)) + geom_point(aes(shape = trip), size = 2.2) +
+  geom_smooth(method = "lm", formula = y ~ x, colour = "black") +
+  facet_wrap(~ isotope, scales = "free_y") + theme_bw() +
+  labs(x = "Standard length (cm)", y = "‰", shape = "Trip")
+g
+ggsave(file.path(FIG, "3_isotopes_vs_length.pdf"), g, width = 8, height = 4, device = cairo_pdf)
+```
+
+# 4. Isotopic niche: males vs female strategies
+
+Males (one sample per male) are compared with each female strategy
+(Post-Breeding strategies; Post-Moult females as one group, since they form a
+continuum). None of these groups were defined from isotopes, so differences
+are not circular.
+
+```{r niche-data}
+niche_dat <- bind_rows(
+  males1 %>% transmute(group = "Males", year, d13C, d15N),
+  females %>% transmute(group, year, d13C, d15N)) %>%
+  group_by(group) %>% filter(n() >= MIN_GROUP_N) %>% ungroup() %>%
+  mutate(group = factor(group, intersect(names(GROUP_COLS), unique(group))))
+table(niche_dat$group)
+
+# Mean differences: males vs each female group (Welch t-tests, BH-adjusted)
+mdiff <- bind_rows(lapply(setdiff(levels(niche_dat$group), "Males"), function(gr) bind_rows(lapply(ISO, function(v) {
+  tt <- t.test(niche_dat[[v]][niche_dat$group == "Males"], niche_dat[[v]][niche_dat$group == gr])
+  data.frame(comparison = paste("Males -", gr), isotope = v,
+             difference = unname(diff(rev(tt$estimate))), lwr = tt$conf.int[1], upr = tt$conf.int[2],
+             p = tt$p.value)
+}))))
+mdiff$p_BH <- p.adjust(mdiff$p, "BH")
+mdiff %>% mutate(across(where(is.double), ~ signif(.x, 3)))
+write.csv(mdiff, file.path(OUT, "4_male_female_differences.csv"), row.names = FALSE)
+```
+
+## nicheROVER: niche size and directional overlap
+
+```{r nicherover}
+run_niche <- function(d, nsamples = N_POST) {
+  d$group <- droplevels(d$group)
+  set.seed(SEED)
+  par <- tapply(seq_len(nrow(d)), d$group,
+                function(ii) niw.post(nsamples = nsamples, X = as.matrix(d[ii, ISO])))
+  seab <- sapply(par, function(sp) apply(sp$Sigma, 3, function(S) pi * sqrt(det(S))))
+  nr95 <- sapply(par, function(sp) apply(sp$Sigma, 3, niche.size, alpha = 0.95))
+  set.seed(SEED)
+  ov <- overlap(par, nreps = nsamples, nprob = nsamples, alpha = c(0.95, 0.99))
+  list(par = par, seab = seab, nr95 = nr95, overlap = ov)
+}
+nb <- run_niche(niche_dat)
+lev <- colnames(nb$seab)
+sea_c <- tapply(seq_len(nrow(niche_dat)), niche_dat$group, function(ii) {
+  m <- length(ii); pi * sqrt(det(cov(niche_dat[ii, ISO]))) * (m - 1) / (m - 2) })
+size_tab <- data.frame(group = lev, n = as.vector(table(niche_dat$group)[lev]),
+  SEAc = as.vector(sea_c[lev]),
+  SEAb_median = apply(nb$seab, 2, median),
+  SEAb_lwr = apply(nb$seab, 2, quantile, 0.025), SEAb_upr = apply(nb$seab, 2, quantile, 0.975),
+  NR95_median = apply(nb$nr95, 2, median))
+size_tab %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(size_tab, file.path(OUT, "4_niche_size.csv"), row.names = FALSE)
+
+# P(male niche larger than each female group's)
+round(sapply(setdiff(lev, "Males"), function(gr) mean(nb$seab[, "Males"] > nb$seab[, gr])), 3)
+
+# Directional overlap (%): P(an individual of the row group falls in the column group's 95% niche)
+ov_mean <- apply(nb$overlap, c(1:2, 4), mean) * 100
+ov_ci   <- apply(nb$overlap * 100, c(1:2, 4), quantile, prob = c(0.025, 0.975), na.rm = TRUE)
+round(ov_mean[, , 1], 1)
+ov_long <- expand.grid(from = lev, into = lev, stringsAsFactors = FALSE) %>%
+  filter(from != into, from == "Males" | into == "Males") %>%
+  mutate(mean = mapply(function(a, b) ov_mean[a, b, 1], from, into),
+         lwr  = mapply(function(a, b) ov_ci[1, a, b, 1], from, into),
+         upr  = mapply(function(a, b) ov_ci[2, a, b, 1], from, into))
+ov_long %>% mutate(across(where(is.double), ~ round(.x, 1)))
+write.csv(ov_long, file.path(OUT, "4_niche_overlap_95.csv"), row.names = FALSE)
+```
+
+```{r niche-plots, fig.height = 6}
+cols <- unname(GROUP_COLS[lev])
+set.seed(SEED)
+par50 <- tapply(seq_len(nrow(niche_dat)), niche_dat$group,
+                function(ii) niw.post(nsamples = 50, X = as.matrix(niche_dat[ii, ISO])))
+dl <- tapply(seq_len(nrow(niche_dat)), niche_dat$group, function(ii) as.matrix(niche_dat[ii, ISO]))
+niche.plot(niche.par = par50, niche.data = dl, pfrac = 0.05,
+           iso.names = expression(delta^{13}*C, delta^{15}*N), col = cols)
+
+g <- ggplot(niche_dat, aes(d13C, d15N, colour = group)) +
+  geom_point(alpha = 0.6, size = 1.8) +
+  stat_ellipse(level = 0.40, type = "norm", linewidth = 0.9) +
+  scale_colour_manual(values = GROUP_COLS, name = NULL) + theme_bw() +
+  labs(x = "δ¹³C (‰)", y = "δ¹⁵N (‰)",
+       caption = "Ellipses: 40% (standard ellipse)")
+g
+ggsave(file.path(FIG, "4_niche_ellipses.pdf"), g, width = 8, height = 5, device = cairo_pdf)
+```
+
+## SIBER: standard ellipse areas and ellipse overlap
+
+```{r siber, eval = HAS_SIBER}
+codes <- setNames(paste0("G", seq_along(lev)), lev)
+siber <- SIBER::createSiberObject(data.frame(iso1 = niche_dat$d13C, iso2 = niche_dat$d15N,
+                                             group = unname(codes[as.character(niche_dat$group)]),
+                                             community = 1))
+ell_id <- setNames(paste0("1.", codes), lev)
+ml_siber <- SIBER::groupMetricsML(siber); colnames(ml_siber) <- lev[match(colnames(ml_siber), ell_id)]
+round(ml_siber, 3)
+set.seed(SEED)
+ell_post <- SIBER::siberMVN(siber, SIBER_PARMS, SIBER_PRIORS)
+sea_b <- SIBER::siberEllipses(ell_post); colnames(sea_b) <- lev[match(names(ell_post), ell_id)]
+siber_size <- data.frame(group = colnames(sea_b), SEAc = ml_siber["SEAc", colnames(sea_b)],
+                         SEAb_median = apply(sea_b, 2, median),
+                         SEAb_lwr = apply(sea_b, 2, quantile, 0.025),
+                         SEAb_upr = apply(sea_b, 2, quantile, 0.975), row.names = NULL)
+siber_size %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(siber_size, file.path(OUT, "4_SIBER_niche_size.csv"), row.names = FALSE)
+
+q3 <- function(x) sprintf("%.2f (%.2f-%.2f)", median(x, na.rm = TRUE),
+                          quantile(x, .025, na.rm = TRUE), quantile(x, .975, na.rm = TRUE))
+set.seed(SEED)
+siber_ov <- bind_rows(lapply(setdiff(lev, "Males"), function(gr) {
+  b <- SIBER::bayesianOverlap(ell_id[["Males"]], ell_id[[gr]], ell_post,
+                              draws = SIBER_DRAWS, p.interval = SIBER_P, n = 100)
+  data.frame(comparison = paste("Males vs", gr),
+             prop_of_union = q3(b$overlap / (b$area1 + b$area2 - b$overlap)),
+             prop_of_male_ellipse = q3(b$overlap / b$area1),
+             prop_of_female_ellipse = q3(b$overlap / b$area2))
+}))
+siber_ov
+write.csv(siber_ov, file.path(OUT, "4_SIBER_overlap.csv"), row.names = FALSE)
+```
+
+## Sensitivity: females from the same years as males
+
+Males were sampled only in `r paste(range(males$year), collapse = "–")`.
+Isotopic baselines vary among years, so the comparison is repeated with females
+from the same years only (groups with fewer than `MIN_GROUP_N` females are dropped).
+
+```{r niche-sameyears}
+yrs <- unique(males$year)
+nd_y <- bind_rows(
+  males1 %>% transmute(group = "Males", year, d13C, d15N),
+  females %>% filter(year %in% yrs) %>% transmute(group, year, d13C, d15N)) %>%
+  group_by(group) %>% filter(n() >= MIN_GROUP_N) %>% ungroup() %>%
+  mutate(group = factor(group, intersect(names(GROUP_COLS), unique(group))))
+table(nd_y$group)
+
+# Male - female differences adjusted for year
+set.seed(SEED)
+bind_rows(lapply(setdiff(levels(nd_y$group), "Males"), function(gr) bind_rows(lapply(ISO, function(v) {
+  d <- nd_y %>% filter(group %in% c("Males", gr)) %>%
+    mutate(group = relevel(droplevels(group), "Males"), Year = factor(year))
+  f <- lm(reformulate(c("group", "Year"), v), data = d)
+  cf <- coef(f)[2]; ci <- confint(f)[2, ]
+  data.frame(comparison = paste("Males -", gr), isotope = v,
+             difference = -unname(cf), lwr = -unname(ci[2]), upr = -unname(ci[1]),
+             p_perm = fl_test(d, v, "group", "Year", B = 4999)$p_perm)
+})))) %>% mutate(across(where(is.double), ~ signif(.x, 3)))
+
+nb_y <- run_niche(nd_y, nsamples = 5000)
+round(apply(nb_y$overlap, c(1:2, 4), mean)[, , 1] * 100, 1)
+round(apply(nb_y$seab, 2, median), 3)
+```
+
+# 5. Repeatability
+
+## Population-level repeatability
+
+All males are used (males sampled once help estimate the variance
+components). Year is a fixed effect, because three years are too few for a
+random effect. With only `r sum(table(males$MainID) > 1)` repeat males, the
+estimates are exploratory and CIs will be wide.
+
+```{r rpt}
+rep_ids <- names(which(table(males$MainID) > 1))
+set.seed(SEED)
+rpt_tab <- bind_rows(lapply(ISO, function(v) {
+  d_rep <- males %>% filter(MainID %in% rep_ids) %>% mutate(MainID = factor(MainID))
+  d_all <- males %>% mutate(MainID = factor(MainID))
+  ra <- tryCatch(fit_rpt(reformulate(c("Trip", "(1 | MainID)"), v), grname = "MainID", data = d_rep,
+                         datatype = "Gaussian", nboot = N_RPT_BOOT, npermut = N_RPT_PERM),
+                 error = function(e) NULL)
+  rb <- tryCatch(fit_rpt(reformulate(c("Trip", "Year", "(1 | MainID)"), v), grname = "MainID", data = d_all,
+                         datatype = "Gaussian", nboot = N_RPT_BOOT, npermut = N_RPT_PERM),
+                 error = function(e) NULL)
+  bind_rows(
+    rpt_row(ra, paste(v, "(a) original: repeat males, trip"), nrow(d_rep), length(rep_ids), length(rep_ids)),
+    rpt_row(rb, paste(v, "(b) all males, trip + year"), nrow(d_all), nlevels(d_all$MainID), length(rep_ids)))
+}))
+rpt_tab %>% mutate(across(where(is.double), ~ signif(.x, 3)))
+write.csv(rpt_tab, file.path(OUT, "5_repeatability.csv"), row.names = FALSE)
+```
+
+## Within-male differences vs males sampled in the same years
+
+```{r rpt-pairs}
+pr <- within_pairs(males %>% dplyr::select(MainID, row, trip, year)) %>%
+  mutate(abs_d13C = abs(males$d13C[row_1] - males$d13C[row_2]),
+         abs_d15N = abs(males$d15N[row_1] - males$d15N[row_2]),
+         abs_gradient = abs(males$gradient[row_1] - males$gradient[row_2]))
+pr %>% dplyr::select(MainID, trip_1, year_1, trip_2, year_2, abs_d13C, abs_d15N) %>%
+  mutate(across(where(is.double), ~ round(.x, 2)))
+
+cands <- function(male, tp, yr) {
+  c1 <- which(males$MainID != male & males$trip == tp & males$year == yr)
+  if (length(c1)) c1 else which(males$MainID != male & males$trip == tp)
+}
+c1 <- lapply(seq_len(nrow(pr)), function(k) cands(pr$MainID[k], pr$trip_1[k], pr$year_1[k]))
+c2 <- lapply(seq_len(nrow(pr)), function(k) cands(pr$MainID[k], pr$trip_2[k], pr$year_2[k]))
+set.seed(SEED)
+null_d <- replicate(N_PERM, {
+  d <- vapply(seq_len(nrow(pr)), function(k) {
+    a <- pick1(c1[[k]]); bc <- c2[[k]][males$MainID[c2[[k]]] != males$MainID[a]]
+    if (!length(bc)) return(c(NA_real_, NA_real_, NA_real_))
+    b <- pick1(bc)
+    c(abs(males$d13C[a] - males$d13C[b]), abs(males$d15N[a] - males$d15N[b]),
+      abs(males$gradient[a] - males$gradient[b]))
+  }, numeric(3))
+  rowMeans(d, na.rm = TRUE)
+})
+obs_d <- c(mean(pr$abs_d13C), mean(pr$abs_d15N), mean(pr$abs_gradient))
+pair_tab <- data.frame(measure = c("d13C", "d15N", "gradient score"), n_pairs = nrow(pr),
+                       mean_abs_diff_same_male = obs_d, mean_abs_diff_year_matched = rowMeans(null_d),
+                       P = (1 + rowSums(null_d <= obs_d)) / (N_PERM + 1))
+pair_tab %>% mutate(across(where(is.double), ~ signif(.x, 3)))
+write.csv(pair_tab, file.path(OUT, "5_within_male_differences.csv"), row.names = FALSE)
+```
+
+# Summary
+
+```{r summary}
+list(
+  samples = c(samples = nrow(males), males = n_distinct(males$MainID), repeat_males = length(rep_ids)),
+  null_structure = null_struct,
+  bootstrap_LRT = lrt,
+  explanatory = expl %>% dplyr::select(response, term, p_perm, p_BH),
+  male_female_differences = mdiff,
+  niche_size = size_tab,
+  overlap_with_males = ov_long,
+  SIBER_size = if (exists("siber_size")) siber_size else "SIBER not run",
+  SIBER_overlap = if (exists("siber_ov")) siber_ov else "SIBER not run",
+  repeatability = rpt_tab %>% dplyr::select(variable, R, lwr, upr, P_LRT),
+  within_male_differences = pair_tab)
+sessionInfo()
+```
+
+# Suggested Methods text
+
+*Males were sampled for stable isotopes (δ¹³C, δ¹⁵N) on arrival at the colony
+(2011–2013; n samples, n males) and measured for standard length; no tracking
+data were available. We tested for discrete isotopic groups with Gaussian
+mixture models allowing correlated isotopes (1–4 components; mclust), a
+parametric bootstrap likelihood-ratio test of one vs two components, and by
+comparing the silhouette width of Ward clusters with that obtained from data
+simulated from a single bivariate normal distribution. Because these tests did
+not support discrete groups [update from results], we summarised isotopic
+variation as each male's score on the first principal component of the
+standardised isotopes, and tested whether it varied with standard length, trip
+type and year (Freedman–Lane permutation tests, one sample per male). Male
+isotopic niche size (SEAc, SEA_B) and directional overlap with each female
+strategy were estimated with SIBER and nicheROVER (default non-informative
+prior), including a sensitivity analysis restricted to females sampled in the
+same years. Repeatability of isotope values was estimated with linear mixed
+models (trip type and year as fixed effects, individual as random effect;
+rptR), and within-male differences were compared with those between males
+sampled in the same years and trip types (9,999 randomisations).*
