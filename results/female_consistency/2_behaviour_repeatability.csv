@@ -1,0 +1,6 @@
+"variable","n_obs","n_females","n_repeat_females","R","SE","lwr","upr","P_LRT","P_permut","R_year","P_LRT_year"
+"Dim 1 (latitude / offshore axis)",179,157,17,0.785,0.0693,0.631,0.891,0,0.001,0.0389,0.051
+"Dim 2 (diving-effort axis)",179,157,17,0.264,0.177,0,0.616,0.124,0.14,0,1
+"Maximum latitude",179,157,17,0.843,0.0548,0.702,0.922,0,0.001,0,1
+"California Current use (logit)",179,157,17,0.64,0.12,0.369,0.819,0.002,0.078,0,0.5
+"Distance to shelf (log)",179,157,17,0.775,0.0741,0.6,0.892,0,0.003,0.0192,0.192
