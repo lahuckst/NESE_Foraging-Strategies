@@ -11,7 +11,7 @@
 
 <meta name="author" content="Luis Huckstadt" />
 
-<meta name="date" content="2026-11-06" />
+<meta name="date" content="2026-11-10" />
 
 <title>NESE males: isotopic structure, niche and repeatability</title>
 
@@ -441,7 +441,7 @@ display: none;
 <h1 class="title toc-ignore">NESE males: isotopic structure, niche and
 repeatability</h1>
 <h4 class="author">Luis Huckstadt</h4>
-<h4 class="date">2026-11-06</h4>
+<h4 class="date">2026-11-10</h4>
 
 </div>
 
@@ -1083,11 +1083,11 @@ siber_size &lt;- data.frame(group = colnames(sea_b), SEAc = ml_siber[&quot;SEAc&
                          SEAb_upr = apply(sea_b, 2, quantile, 0.975), row.names = NULL)
 siber_size %&gt;% mutate(across(where(is.double), ~ round(.x, 3)))</code></pre>
 <pre><code>##                            group  SEAc SEAb_median SEAb_lwr SEAb_upr
-## 1                          Males 1.024       1.038    0.771    1.436
-## 2          Females PB: Subarctic 0.372       0.377    0.287    0.500
-## 3  Females PB: N Central Pacific 0.280       0.296    0.220    0.414
-## 4 Females PB: California Current 0.452       0.559    0.267    1.463
-## 5                     Females PM 0.511       0.515    0.420    0.638</code></pre>
+## 1                          Males 1.024       1.035    0.773    1.446
+## 2          Females PB: Subarctic 0.372       0.376    0.286    0.509
+## 3  Females PB: N Central Pacific 0.280       0.298    0.221    0.417
+## 4 Females PB: California Current 0.452       0.555    0.267    1.467
+## 5                     Females PM 0.511       0.516    0.423    0.643</code></pre>
 <pre class="r"><code>write.csv(siber_size, file.path(OUT, &quot;4_SIBER_niche_size.csv&quot;), row.names = FALSE)
 
 q3 &lt;- function(x) sprintf(&quot;%.2f (%.2f-%.2f)&quot;, median(x, na.rm = TRUE),
@@ -1103,15 +1103,15 @@ siber_ov &lt;- bind_rows(lapply(setdiff(lev, &quot;Males&quot;), function(gr) {
 }))
 siber_ov</code></pre>
 <pre><code>##                                comparison    prop_of_union prop_of_male_ellipse
-## 1          Males vs Females PB: Subarctic 0.15 (0.08-0.21)     0.18 (0.10-0.25)
-## 2  Males vs Females PB: N Central Pacific 0.11 (0.05-0.15)     0.13 (0.06-0.18)
-## 3 Males vs Females PB: California Current 0.21 (0.07-0.40)     0.27 (0.11-0.57)
-## 4                     Males vs Females PM 0.17 (0.10-0.22)     0.22 (0.14-0.28)
+## 1          Males vs Females PB: Subarctic 0.15 (0.08-0.21)     0.17 (0.11-0.25)
+## 2  Males vs Females PB: N Central Pacific 0.11 (0.05-0.15)     0.13 (0.07-0.17)
+## 3 Males vs Females PB: California Current 0.20 (0.08-0.38)     0.26 (0.11-0.52)
+## 4                     Males vs Females PM 0.17 (0.10-0.23)     0.22 (0.14-0.28)
 ##   prop_of_female_ellipse
-## 1       0.48 (0.25-0.67)
-## 2       0.44 (0.18-0.64)
-## 3       0.51 (0.15-0.87)
-## 4       0.44 (0.25-0.62)</code></pre>
+## 1       0.48 (0.26-0.67)
+## 2       0.44 (0.21-0.61)
+## 3       0.51 (0.15-0.86)
+## 4       0.44 (0.25-0.60)</code></pre>
 <pre class="r"><code>write.csv(siber_ov, file.path(OUT, &quot;4_SIBER_overlap.csv&quot;), row.names = FALSE)</code></pre>
 </div>
 <div id="sensitivity-females-from-the-same-years-as-males" class="section level2" number="7.3">
@@ -1366,23 +1366,23 @@ pair_tab %&gt;% mutate(across(where(is.double), ~ signif(.x, 3)))</code></pre>
 ## 
 ## $SIBER_size
 ##                            group      SEAc SEAb_median  SEAb_lwr  SEAb_upr
-## 1                          Males 1.0243805   1.0384284 0.7714130 1.4355194
-## 2          Females PB: Subarctic 0.3721275   0.3771700 0.2866969 0.4996105
-## 3  Females PB: N Central Pacific 0.2798224   0.2962461 0.2195618 0.4139135
-## 4 Females PB: California Current 0.4524817   0.5585272 0.2672014 1.4630234
-## 5                     Females PM 0.5105670   0.5150568 0.4202905 0.6376348
+## 1                          Males 1.0243805   1.0353239 0.7734175 1.4456622
+## 2          Females PB: Subarctic 0.3721275   0.3759132 0.2855411 0.5089517
+## 3  Females PB: N Central Pacific 0.2798224   0.2979561 0.2205459 0.4172008
+## 4 Females PB: California Current 0.4524817   0.5553700 0.2671641 1.4668041
+## 5                     Females PM 0.5105670   0.5158322 0.4234337 0.6428203
 ## 
 ## $SIBER_overlap
 ##                                comparison    prop_of_union prop_of_male_ellipse
-## 1          Males vs Females PB: Subarctic 0.15 (0.08-0.21)     0.18 (0.10-0.25)
-## 2  Males vs Females PB: N Central Pacific 0.11 (0.05-0.15)     0.13 (0.06-0.18)
-## 3 Males vs Females PB: California Current 0.21 (0.07-0.40)     0.27 (0.11-0.57)
-## 4                     Males vs Females PM 0.17 (0.10-0.22)     0.22 (0.14-0.28)
+## 1          Males vs Females PB: Subarctic 0.15 (0.08-0.21)     0.17 (0.11-0.25)
+## 2  Males vs Females PB: N Central Pacific 0.11 (0.05-0.15)     0.13 (0.07-0.17)
+## 3 Males vs Females PB: California Current 0.20 (0.08-0.38)     0.26 (0.11-0.52)
+## 4                     Males vs Females PM 0.17 (0.10-0.23)     0.22 (0.14-0.28)
 ##   prop_of_female_ellipse
-## 1       0.48 (0.25-0.67)
-## 2       0.44 (0.18-0.64)
-## 3       0.51 (0.15-0.87)
-## 4       0.44 (0.25-0.62)
+## 1       0.48 (0.26-0.67)
+## 2       0.44 (0.21-0.61)
+## 3       0.51 (0.15-0.86)
+## 4       0.44 (0.25-0.60)
 ## 
 ## $repeatability
 ##                                variable     R   lwr   upr P_LRT
