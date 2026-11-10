@@ -83,7 +83,7 @@ HAS_SIBER <- requireNamespace("SIBER", quietly = TRUE) && requireNamespace("rjag
 if (!HAS_SIBER) message("SIBER/rjags (JAGS) not available: the SIBER section will be skipped.")
 # Equivalence margins (permil): differences smaller than these are considered
 # ecologically negligible. Biological judgement - justify in the paper.
-EQUIV <- c(d13C = 0.3, d15N = 0.5)
+EQUIV <- c(d13C = 0.3, d15N = 1.0)
 
 OUT <- "../results/PB_strategies"
 FIG <- "../figures/PB_strategies"

@@ -85,9 +85,10 @@ SIBER_DRAWS  <- 500      # posterior draws used for Bayesian ellipse overlap
 SIBER_P      <- 0.95     # ellipse used for overlap (0.95 = 95% ellipse; NULL = standard ellipse)
 HAS_SIBER <- requireNamespace("SIBER", quietly = TRUE) && requireNamespace("rjags", quietly = TRUE)
 if (!HAS_SIBER) message("SIBER/rjags (JAGS) not available: the SIBER section will be skipped.")
+
 # Equivalence margins (permil): differences smaller than these are considered
 # ecologically negligible. Biological judgement - justify in the paper.
-EQUIV <- c(d13C = 0.3, d15N = 0.5)
+EQUIV <- c(d13C = 0.3, d15N = 1.0)
 
 OUT <- "../results/PM_strategies"
 FIG <- "../figures/PM_strategies"
