@@ -1,2 +1,6 @@
 "A","B","ML_prop_of_union","Bayes_prop_of_union","Bayes_prop_of_A","Bayes_prop_of_B"
+<<<<<<< HEAD
 "North Central Pacific","Subarctic",0.545144986595145,"0.46 (0.24-0.66)","0.90 (0.56-1.00)","0.48 (0.28-0.71)"
+=======
+"North Central Pacific","Subarctic",0.545144986595145,"0.47 (0.25-0.64)","0.92 (0.58-1.00)","0.49 (0.29-0.70)"
+>>>>>>> 8f6bbec777ccb6d2724362e88481b343ae40439b
