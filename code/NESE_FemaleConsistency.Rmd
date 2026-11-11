@@ -1,6 +1,6 @@
 ---
 title: "NESE females: do repeat females keep their foraging pattern?"
-author: "Luis Huckstadt & Sarah Peterson & Sarah Peterson"
+author: "Luis Huckstadt & Sarah Peterson"
 date: "`r format(Sys.Date(), '%Y-%m-%d')`"
 output:
   html_document:
