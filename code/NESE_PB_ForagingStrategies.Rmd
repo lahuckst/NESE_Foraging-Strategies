@@ -690,6 +690,51 @@ tost <- bind_rows(lapply(ISO, function(v) {
              different  = ci$lwr > 0 | ci$upr < 0)
 }))
 tost %>% mutate(across(where(is.numeric), ~ round(.x, 3)))
+write.csv(tost, file.path(OUT, "B_isotope_equivalence.csv"), row.names = FALSE)
+```
+
+### Figure: isotope differences against the equivalence margins (Fig. 2c)
+
+Each strategy pair is shown with its year-adjusted difference, the 95 % CI
+(thin line, test of difference) and the 90 % CI (thick line, equivalence
+test). The shaded band is the equivalence margin. A pair is "equivalent" when
+the thick line lies inside the band, and "different" when the thin line
+excludes zero; both can be true (different, but negligibly so).
+
+```{r fig-equivalence, fig.width = 8, fig.height = 3.5}
+ISO_LAB <- c(d13C = "Δδ¹³C (‰)", d15N = "Δδ¹⁵N (‰)")
+eq <- tost %>%
+  dplyr::select(isotope, contrast, estimate, lwr90 = lwr, upr90 = upr, margin, equivalent) %>%
+  left_join(contr %>% dplyr::select(isotope, contrast, lwr95 = lwr, upr95 = upr),
+            by = c("isotope", "contrast")) %>%
+  mutate(different = lwr95 > 0 | upr95 < 0,
+         verdict = dplyr::case_when(equivalent & different ~ "Different but negligible",
+                                    equivalent ~ "Equivalent",
+                                    different ~ "Different",
+                                    TRUE ~ "Inconclusive"),
+         verdict = factor(verdict, c("Equivalent", "Different but negligible", "Different", "Inconclusive")),
+         contrast = gsub("North Central Pacific", "N Central Pacific", contrast),
+         contrast = factor(gsub(" - ", " − ", contrast)),
+         contrast = factor(contrast, rev(unique(as.character(contrast)))))
+mdf <- data.frame(isotope = names(EQUIV), margin = unname(EQUIV))
+
+g_eq <- ggplot(eq, aes(estimate, contrast)) +
+  geom_rect(data = mdf, aes(xmin = -margin, xmax = margin, ymin = -Inf, ymax = Inf),
+            inherit.aes = FALSE, fill = "grey90") +
+  geom_vline(xintercept = 0, linetype = 2, colour = "grey50") +
+  geom_linerange(aes(xmin = lwr95, xmax = upr95), linewidth = 0.5) +
+  geom_linerange(aes(xmin = lwr90, xmax = upr90), linewidth = 1.8) +
+  geom_point(aes(fill = verdict), shape = 21, size = 3, stroke = 0.8) +
+  facet_wrap(~ isotope, scales = "free_x", labeller = as_labeller(ISO_LAB)) +
+  scale_fill_manual(values = c(Equivalent = "white", `Different but negligible` = "grey60",
+                               Different = "black", Inconclusive = "#fdae61"),
+                    drop = FALSE, name = NULL) +
+  theme_bw() + theme(legend.position = "bottom", panel.grid.minor = element_blank()) +
+  labs(x = "Difference between strategies (‰), adjusted for year", y = NULL,
+       caption = sprintf("Thick: 90 %% CI; thin: 95 %% CI; shaded: equivalence margin (±%.1f ‰ δ¹³C, ±%.1f ‰ δ¹⁵N)",
+                         EQUIV[["d13C"]], EQUIV[["d15N"]]))
+g_eq
+ggsave(file.path(FIG, "B_isotope_equivalence.pdf"), g_eq, width = 8, height = 3.5, device = cairo_pdf)
 ```
 
 ## Isotopic niche size and overlap (nicheROVER)
