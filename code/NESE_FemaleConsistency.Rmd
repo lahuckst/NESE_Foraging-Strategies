@@ -238,6 +238,53 @@ write.csv(fid_tab, file.path(OUT, "1_strategy_fidelity.csv"), row.names = FALSE)
 write.csv(fid, file.path(OUT, "1_strategy_fidelity_pairs.csv"), row.names = FALSE)
 ```
 
+## Figure: strategy sequences of repeat females (Fig. 5a)
+
+One row per female tracked more than once. Points are trips, coloured by
+strategy (circles = post-breeding, triangles = post-moult); post-moult trips
+are drawn half a year after the post-breeding trip of the same year. Solid
+lines join consecutive trips with the same strategy, dashed lines a change.
+Females that changed strategy are listed at the top.
+
+```{r fig-strategy-sequences, fig.width = 7, fig.height = 5}
+STRAT_COLS <- c(Subarctic = "#1b9e77", `North Central Pacific` = "#d95f02",
+                `California Current` = "#7570b3")
+seq_d <- trk %>%
+  filter(MainID %in% rep_ids, !is.na(strategy)) %>%
+  mutate(MainID = as.character(MainID),
+         x = year + ifelse(trip == "PM", 0.5, 0)) %>%
+  arrange(MainID, x)
+segs <- seq_d %>% group_by(MainID) %>%
+  mutate(xend = dplyr::lead(x), s_next = dplyr::lead(strategy)) %>%
+  filter(!is.na(xend)) %>% ungroup() %>%
+  mutate(change = factor(ifelse(strategy == s_next, "Same strategy", "Changed strategy"),
+                         c("Same strategy", "Changed strategy")))
+ord <- seq_d %>% group_by(MainID) %>%
+  summarise(changed = n_distinct(strategy) > 1, first = min(x)) %>%
+  arrange(changed, desc(first)) %>% pull(MainID)          # changers at the top
+seq_d$MainID <- factor(seq_d$MainID, ord)
+segs$MainID  <- factor(segs$MainID, ord)
+
+all_row <- fid_tab[fid_tab$pair_type == "All pairs", ]
+g_seq <- ggplot() +
+  geom_segment(data = segs, aes(x = x, xend = xend, y = MainID, yend = MainID, linetype = change),
+               colour = "grey40") +
+  geom_point(data = seq_d, aes(x, MainID, fill = strategy, shape = trip), size = 3, stroke = 0.6) +
+  scale_fill_manual(values = STRAT_COLS, name = "Strategy",
+                    guide = guide_legend(override.aes = list(shape = 21))) +
+  scale_shape_manual(values = c(PB = 21, PM = 24), name = "Trip",
+                     labels = c(PB = "Post-breeding", PM = "Post-moult")) +
+  scale_linetype_manual(values = c(`Same strategy` = "solid", `Changed strategy` = "22"),
+                        name = NULL, drop = FALSE) +
+  scale_x_continuous(breaks = seq(min(seq_d$year), max(seq_d$year) + 1, 1)) +
+  theme_bw() + theme(panel.grid.minor = element_blank(), panel.grid.major.y = element_line(colour = "grey93")) +
+  labs(x = "Year", y = "Female",
+       subtitle = sprintf("Same strategy in %d of %d trip pairs (%.1f expected by chance; P = %s)",
+                          all_row$n_same, all_row$n_pairs, all_row$expected, signif(all_row$P, 2)))
+g_seq
+ggsave(file.path(FIG, "1_strategy_sequences.pdf"), g_seq, width = 7, height = 5)
+```
+
 # 2. Behavioural repeatability
 
 ## A common behavioural space for both trip types
