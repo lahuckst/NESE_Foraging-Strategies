@@ -1,7 +1,8 @@
 # Table 1 (alternative): mean ± SD of the main variables by sex, trip type and year.
 # Uses the same trips as the analyses: females = trips in the PB/PM strategy
 # assignments (93 PB, 86 PM); males = arrival isotope samples (48).
-# Works from the project root or the code/ folder. Output: results/tables/Table1_by_year_sex.csv
+# Works from the project root or the code/ folder.
+# Outputs: results/tables/Table1_by_year_sex.csv and Table1_by_year_sex.docx (Word)
 
 library(dplyr)
 
@@ -56,3 +57,53 @@ tab <- bind_rows(fem, mal) %>%
 dir.create(p("results", "tables"), showWarnings = FALSE)
 write.csv(tab, p("results", "tables", "Table1_by_year_sex.csv"), row.names = FALSE)
 tab
+
+# ---- Word table ----------------------------------------------------------
+# Writes results/tables/Table1_by_year_sex.docx: a formatted table (landscape,
+# 9 pt Times New Roman, merged Sex/Trip cells, bold "All years" rows) that can
+# be copied straight into the manuscript.
+if (!requireNamespace("flextable", quietly = TRUE) || !requireNamespace("officer", quietly = TRUE))
+  stop("Install the packages for the Word table: install.packages(c(\"flextable\", \"officer\"))")
+library(flextable)
+
+HEAD <- c(Sex = "Sex", Trip = "Trip", Year = "Year", n = "n",
+          TripDuration_days = "Trip duration (d)",
+          MassGainRate_kgPerDay_Dcrocker = "Mass gain (kg d⁻¹)",
+          MaxLat_degrees = "Max. latitude (°N)",
+          MedianDistToContShelf_km = "Distance to shelf (km)",
+          Mean_Depth_m = "Dive depth (m)", Mean_Duration_min = "Dive duration (min)",
+          StandardLength_cm = "Standard length (cm)",
+          d13C = "δ¹³C (‰)", d15N = "δ¹⁵N (‰)")
+
+wt <- tab %>%
+  mutate(Year = ifelse(Year == "All", "All years", Year),
+         across(c(d13C, d15N), ~ sub("^-", "−", .x)),   # typographic minus
+         across(everything(), as.character))
+all_rows <- which(wt$Year == "All years")
+
+ft <- flextable(wt, col_keys = names(HEAD)) %>%
+  set_header_labels(values = as.list(HEAD)) %>%
+  theme_booktabs() %>%
+  merge_v(j = c("Sex", "Trip")) %>%
+  valign(j = c("Sex", "Trip"), valign = "top", part = "body") %>%
+  bold(i = all_rows, part = "body") %>%
+  hline(i = all_rows, border = officer::fp_border(width = 0.75), part = "body") %>%
+  bold(part = "header") %>%
+  align(j = 3:length(HEAD), align = "center", part = "all") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  fontsize(size = 9, part = "all") %>%
+  padding(padding.top = 1, padding.bottom = 1, part = "all") %>%
+  set_caption("Table 1. Mean ± SD of the main variables by sex, trip type and year.") %>%
+  add_footer_lines(paste0(
+    "n = tracked trips (females) or isotope samples (males); behavioural variables are available for females only. ",
+    sprintf("Male standard length was available for %d of %d samples. ",
+            sum(!is.na(mal$StandardLength_cm)), nrow(mal)),
+    "Years with n ≤ 3 should be read with caution.")) %>%
+  fontsize(size = 8, part = "footer") %>%
+  autofit() %>%
+  fix_border_issues()
+
+save_as_docx(ft, path = p("results", "tables", "Table1_by_year_sex.docx"),
+             pr_section = officer::prop_section(page_size = officer::page_size(orient = "landscape")))
+cat("Word table written to", p("results", "tables", "Table1_by_year_sex.docx"), "\n")
+ft
