@@ -132,18 +132,26 @@ g_iso <- ggplot(dat, aes(d13C, d15N)) +
   scale_linetype_manual(values = c(Female = "solid", Male = "22"), name = NULL) +
   labs(x = LAB_C, y = LAB_N, tag = "a") + th
 
-sea_sum$xlab <- with(sea_sum, ifelse(sex == "Male", "Males", ifelse(trip_lab == "Post-moult", "Females",
-                                     sub("North Central Pacific", "N Central\nPacific",
-                                         sub("California Current", "California\nCurrent", as.character(strategy))))))
-g_sea <- ggplot(sea_sum, aes(xlab, median, colour = strategy, shape = sex)) +
-  geom_linerange(aes(ymin = lwr, ymax = upr), linewidth = 0.8) +
-  geom_point(size = 3) +
+xlab_of <- function(d) with(d, ifelse(sex == "Male", "Males", ifelse(trip_lab == "Post-moult", "Females",
+                            sub("North Central Pacific", "N Central\nPacific",
+                                sub("California Current", "California\nCurrent", as.character(strategy))))))
+sea_sum$xlab <- xlab_of(sea_sum)
+# Violins show the posterior draws; extreme tails (outside the central 99 %) are
+# dropped for display only, so a long tail in a small group does not squash the axis
+sea_plot <- sea_long %>% mutate(xlab = xlab_of(.)) %>%
+  group_by(group) %>%
+  filter(SEA_B >= quantile(SEA_B, 0.005), SEA_B <= quantile(SEA_B, 0.995)) %>% ungroup()
+g_sea <- ggplot(sea_plot, aes(xlab, SEA_B)) +
+  geom_violin(aes(fill = strategy, colour = strategy), alpha = 0.35, scale = "width",
+              width = 0.8, linewidth = 0.4) +
+  geom_point(data = sea_sum, aes(xlab, median, colour = strategy, shape = sex), size = 2.8) +
   facet_grid(~ trip_lab, scales = "free_x", space = "free_x") +
+  scale_fill_manual(values = STRAT_COLS, guide = "none") +
   scale_colour_manual(values = STRAT_COLS, guide = "none") +
   scale_shape_manual(values = SEX_SHAPES, guide = "none") +
   scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.05))) +
   labs(x = NULL, y = "SEA_B (\u2030\u00b2)", tag = "b",
-       caption = sprintf("Posterior median and 95 %% credible interval (%s)", METHOD)) + th
+       caption = sprintf("Posterior distributions (central 99 %%) with medians (%s)", METHOD)) + th
 
 ggsave(file.path(FIG, "isotope_biplot_by_sex.pdf"), g_iso, width = 9, height = 5, device = cairo_pdf)
 ggsave(file.path(FIG, "SEA_B_by_sex.pdf"), g_sea, width = 7, height = 4, device = cairo_pdf)
