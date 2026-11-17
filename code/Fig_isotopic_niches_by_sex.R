@@ -1,9 +1,10 @@
-# Isotopic niches of females (by strategy) and males, split by trip type.
+# Isotopic niches of females and males, split by trip type (post-breeding females by strategy;
+# post-moult females as one group, because post-moult foraging is a continuum).
 #   (a) d13C-d15N biplot with standard ellipses (SEAc), one panel per trip type;
 #       colour = strategy / males, symbol = sex.
 #   (b) Bayesian standard ellipse areas (SEA_B, posterior median and 95 % CrI).
 # Groups: post-breeding females (Subarctic, North Central Pacific, California Current),
-# post-moult females (Subarctic and North Central Pacific modes), males (PB, PM).
+# post-moult females (one group), males (PB, PM).
 # SEA_B uses SIBER when SIBER + rjags (JAGS) are installed, otherwise nicheROVER
 # (same quantity: pi * sqrt(det(Sigma)) from the posterior covariance).
 # Works from the project root or the code/ folder (run the PB and PM scripts first).
@@ -30,7 +31,8 @@ SIBER_PARMS  <- list(n.iter = 2e4, n.burnin = 1e3, n.thin = 10, n.chains = 2)
 SIBER_PRIORS <- list(R = 1 * diag(2), k = 2, tau.mu = 1.0E-3)
 
 STRAT_COLS <- c("Subarctic" = "#1b9e77", "North Central Pacific" = "#d95f02",
-                "California Current" = "#7570b3", "Males" = "#d73027")
+                "California Current" = "#7570b3", "Post-moult females" = "grey40",
+                "Males" = "#d73027")
 SEX_SHAPES <- c(Female = 16, Male = 17)          # filled circle, filled triangle
 TRIP_LAB   <- c(PB = "Post-breeding", PM = "Post-moult")
 LAB_C <- "\u03b4\u00b9\u00b3C (\u2030)"; LAB_N <- "\u03b4\u00b9\u2075N (\u2030)"
@@ -44,7 +46,9 @@ females <- bind_rows(
   read.csv(p("results", "PB_strategies", "A_strategy_assignments.csv")) %>% mutate(trip = "PB"),
   read.csv(p("results", "PM_strategies", "A_strategy_assignments.csv")) %>% mutate(trip = "PM")) %>%
   transmute(TOPPID = as.character(TOPPID), ID = as.character(MainID), year = ProcedureYear,
-            trip, strategy, sex = "Female") %>%
+            trip, sex = "Female",
+            # post-moult females are not split into strategies
+            strategy = ifelse(trip == "PM", "Post-moult females", strategy)) %>%
   left_join(iso_by_trip, by = "TOPPID")
 
 males <- meta %>%
@@ -57,13 +61,13 @@ males <- meta %>%
 dat <- bind_rows(females, males) %>%
   filter(!is.na(d13C), !is.na(d15N)) %>%
   mutate(group = ifelse(sex == "Male", paste("Males", trip),
-                        paste("Females", trip, strategy)))
+                        ifelse(trip == "PM", "Females PM", paste("Females", trip, strategy))))
 if (ONE_PER_INDIVIDUAL)
   dat <- dat %>% arrange(year) %>% distinct(group, ID, .keep_all = TRUE)
 
 GROUP_ORDER <- c(paste("Females PB", c("Subarctic", "North Central Pacific", "California Current")),
                  "Males PB",
-                 paste("Females PM", c("Subarctic", "North Central Pacific")),
+                 "Females PM",
                  "Males PM")
 dat <- dat %>%
   mutate(group = factor(group, intersect(GROUP_ORDER, unique(group))),
@@ -128,9 +132,9 @@ g_iso <- ggplot(dat, aes(d13C, d15N)) +
   scale_linetype_manual(values = c(Female = "solid", Male = "22"), name = NULL) +
   labs(x = LAB_C, y = LAB_N, tag = "a") + th
 
-sea_sum$xlab <- with(sea_sum, ifelse(sex == "Male", "Males",
+sea_sum$xlab <- with(sea_sum, ifelse(sex == "Male", "Males", ifelse(trip_lab == "Post-moult", "Females",
                                      sub("North Central Pacific", "N Central\nPacific",
-                                         sub("California Current", "California\nCurrent", as.character(strategy)))))
+                                         sub("California Current", "California\nCurrent", as.character(strategy))))))
 g_sea <- ggplot(sea_sum, aes(xlab, median, colour = strategy, shape = sex)) +
   geom_linerange(aes(ymin = lwr, ymax = upr), linewidth = 0.8) +
   geom_point(size = 3) +
