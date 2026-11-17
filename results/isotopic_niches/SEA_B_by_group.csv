@@ -1,0 +1,7 @@
+"group","trip_lab","strategy","sex","median","lwr","upr","n","method"
+"Females PB Subarctic","Post-breeding","Subarctic","Female",0.376035653399801,0.284720356543473,0.500905737329449,48,"SIBER"
+"Females PB North Central Pacific","Post-breeding","North Central Pacific","Female",0.296205221189074,0.216823881579388,0.412471957686245,39,"SIBER"
+"Females PB California Current","Post-breeding","California Current","Female",0.553259094115134,0.267515463752989,1.41280560993693,6,"SIBER"
+"Males PB","Post-breeding","Males","Male",1.19959650917529,0.817749452329302,1.88532846878769,23,"SIBER"
+"Females PM","Post-moult","Post-moult females","Female",0.518342957717078,0.42455516453135,0.637881147024715,86,"SIBER"
+"Males PM","Post-moult","Males","Male",1.06274867322446,0.724761925305744,1.61918802162138,25,"SIBER"
