@@ -1,0 +1,17 @@
+Section,Measure,n,Observed,Comparison,P
+Strategy fidelity (same strategy on both trips),Post-breeding – post-breeding,6 pairs,6 of 6,2.6 expected by chance,0.007
+Strategy fidelity (same strategy on both trips),Post-moult – post-moult,4 pairs,4 of 4,2.0 expected by chance,0.061
+Strategy fidelity (same strategy on both trips),Post-breeding – post-moult,17 pairs,13 of 17,7.9 expected by chance,0.011
+Strategy fidelity (same strategy on both trips),All pairs,27 pairs,23 of 27,12.5 expected by chance,< 0.001
+Repeatability,Maximum latitude,"179 trips, 157 females (17 repeat)",R = 0.84 (0.70–0.92),year: R = 0.00,< 0.001
+Repeatability,Latitude / offshore axis (PC1),"179 trips, 157 females (17 repeat)",R = 0.79 (0.63–0.89),year: R = 0.04,< 0.001
+Repeatability,Distance to shelf (log),"179 trips, 157 females (17 repeat)",R = 0.78 (0.60–0.89),year: R = 0.02,< 0.001
+Repeatability,California Current use (logit),"179 trips, 157 females (17 repeat)",R = 0.64 (0.37–0.82),year: R = 0.00,0.002
+Repeatability,Diving-effort axis (PC2),"179 trips, 157 females (17 repeat)",R = 0.26 (0.00–0.62),year: R = 0.00,0.124
+Repeatability,δ¹³C,"259 samples, 197 females (47 repeat)",R = 0.75 (0.64–0.83),year: R = 0.02,< 0.001
+Repeatability,δ¹⁵N,"259 samples, 197 females (47 repeat)",R = 0.77 (0.67–0.85),year: R = 0.04,< 0.001
+"Spatial fidelity (overlap between a female's trips, BA)",Post-breeding – post-breeding,5 pairs,BA = 0.81,same-strategy females: 0.46; random females: 0.30,< 0.001ᵃ
+"Spatial fidelity (overlap between a female's trips, BA)",Post-moult – post-moult,4 pairs,BA = 0.60,same-strategy females: 0.34; random females: 0.23,< 0.001ᵃ
+"Spatial fidelity (overlap between a female's trips, BA)",Post-breeding – post-moult,14 pairs,BA = 0.35,random females: 0.25,0.012
+Isotope differences between a female's samples,δ¹³C,,|Δ| = 0.16 ‰,"different females, same years: 0.34 ‰",< 0.001
+Isotope differences between a female's samples,δ¹⁵N,,|Δ| = 0.45 ‰,"different females, same years: 0.95 ‰",< 0.001

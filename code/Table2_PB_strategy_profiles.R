@@ -1,5 +1,5 @@
 # Table 2: post-breeding strategy profiles.
-# n per strategy; key behavioural variables used for clustering (mean ± SD);
+# n per strategy; key behavioural variables used for clustering (mean +/- SD);
 # variables not used for clustering (trip duration, mass gain, isotopes);
 # isotopic niche size (SEA_B). Tests come from the PB report's saved results.
 # Works from the project root or the code/ folder (run NESE_PB_ForagingStrategies.Rmd first).
@@ -25,7 +25,7 @@ dat <- read.csv(file.path(RES, "A_strategy_assignments.csv")) %>%
   mutate(TOPPID = as.character(TOPPID)) %>%
   left_join(beh, by = "TOPPID") %>% left_join(meta, by = "TOPPID") %>%
   mutate(strategy = factor(strategy, STRATS),
-         WestLon = 360 - MinLon_degrees,                  # 0-360 °E to °W
+         WestLon = 360 - MinLon_degrees,                  # 0-360 \u00b0E to \u00b0W
          across(c(MesoEcoProportionSubArcticPac, MesoEcoProportionNorthCPac,
                   MesoEcoProportionCAC, MesoEcoProportionShelf, Pct_BenthicDives), ~ .x * 100),
          Mean_Duration_min = Mean_Duration_sec / 60)
