@@ -1,4 +1,4 @@
-# Table 1 (alternative): mean ± SD of the main variables by sex, trip type and year.
+# Table 1 (alternative): mean +/- SD of the main variables by sex, trip type and year.
 # Uses the same trips as the analyses: females = trips in the PB/PM strategy
 # assignments (93 PB, 86 PM); males = arrival isotope samples (48).
 # Works from the project root or the code/ folder.
@@ -38,13 +38,13 @@ VARS <- c(TripDuration_days = 0, MassGainRate_kgPerDay_Dcrocker = 2, MaxLat_degr
           StandardLength_cm = 0, d13C = 2, d15N = 2)
 msd <- function(x, dp) {
   x <- x[!is.na(x)]
-  if (!length(x)) return("—")
+  if (!length(x)) return("\u2014")
   if (length(x) == 1) return(formatC(x, format = "f", digits = dp))
-  paste(formatC(mean(x), format = "f", digits = dp), "±", formatC(sd(x), format = "f", digits = dp))
+  paste(formatC(mean(x), format = "f", digits = dp), "\u00b1", formatC(sd(x), format = "f", digits = dp))
 }
 summ <- function(d) {
   out <- data.frame(n = nrow(d))
-  for (v in names(VARS)) out[[v]] <- if (v %in% names(d)) msd(d[[v]], VARS[[v]]) else "—"
+  for (v in names(VARS)) out[[v]] <- if (v %in% names(d)) msd(d[[v]], VARS[[v]]) else "\u2014"
   out
 }
 tab <- bind_rows(fem, mal) %>%
@@ -68,16 +68,16 @@ library(flextable)
 
 HEAD <- c(Sex = "Sex", Trip = "Trip", Year = "Year", n = "n",
           TripDuration_days = "Trip duration (d)",
-          MassGainRate_kgPerDay_Dcrocker = "Mass gain (kg d⁻¹)",
-          MaxLat_degrees = "Max. latitude (°N)",
+          MassGainRate_kgPerDay_Dcrocker = "Mass gain (kg d\u207b\u00b9)",
+          MaxLat_degrees = "Max. latitude (\u00b0N)",
           MedianDistToContShelf_km = "Distance to shelf (km)",
           Mean_Depth_m = "Dive depth (m)", Mean_Duration_min = "Dive duration (min)",
           StandardLength_cm = "Standard length (cm)",
-          d13C = "δ¹³C (‰)", d15N = "δ¹⁵N (‰)")
+          d13C = "\u03b4\u00b9\u00b3C (\u2030)", d15N = "\u03b4\u00b9\u2075N (\u2030)")
 
 wt <- tab %>%
   mutate(Year = ifelse(Year == "All", "All years", Year),
-         across(c(d13C, d15N), ~ sub("^-", "−", .x)),   # typographic minus
+         across(c(d13C, d15N), ~ sub("^-", "\u2212", .x)),   # typographic minus
          across(everything(), as.character))
 all_rows <- which(wt$Year == "All years")
 
@@ -93,12 +93,12 @@ ft <- flextable(wt, col_keys = names(HEAD)) %>%
   font(fontname = "Times New Roman", part = "all") %>%
   fontsize(size = 9, part = "all") %>%
   padding(padding.top = 1, padding.bottom = 1, part = "all") %>%
-  set_caption("Table 1. Mean ± SD of the main variables by sex, trip type and year.") %>%
+  set_caption("Table 1. Mean \u00b1 SD of the main variables by sex, trip type and year.") %>%
   add_footer_lines(paste0(
     "n = tracked trips (females) or isotope samples (males); behavioural variables are available for females only. ",
     sprintf("Male standard length was available for %d of %d samples. ",
             sum(!is.na(mal$StandardLength_cm)), nrow(mal)),
-    "Years with n ≤ 3 should be read with caution.")) %>%
+    "Years with n \u2264 3 should be read with caution.")) %>%
   fontsize(size = 8, part = "footer") %>%
   autofit() %>%
   fix_border_issues()
