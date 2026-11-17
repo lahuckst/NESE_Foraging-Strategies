@@ -1,20 +1,26 @@
 # Table 1 (alternative): mean ± SD of the main variables by sex, trip type and year.
 # Uses the same trips as the analyses: females = trips in the PB/PM strategy
 # assignments (93 PB, 86 PM); males = arrival isotope samples (48).
-# Run from the code/ folder. Output: results/tables/Table1_by_year_sex.csv
+# Works from the project root or the code/ folder. Output: results/tables/Table1_by_year_sex.csv
 
 library(dplyr)
 
-meta <- read.csv("../data/IsotopesDatasetForLuis_2023_4_4.csv")
-beh  <- readRDS("../data/f.PCAdata.1.rds") %>% mutate(TOPPID = as.character(TOPPID))
+# Project root: the folder that contains data/ (works whether the working
+# directory is the project root, e.g. an RStudio project, or code/)
+ROOT <- if (dir.exists("data")) "." else if (dir.exists("../data")) ".." else
+  stop("Cannot find the data/ folder: set the working directory to the project root or code/")
+p <- function(...) file.path(ROOT, ...)
+
+meta <- read.csv(p("data", "IsotopesDatasetForLuis_2023_4_4.csv"))
+beh  <- readRDS(p("data", "f.PCAdata.1.rds")) %>% mutate(TOPPID = as.character(TOPPID))
 m1 <- meta %>% filter(!is.na(TOPPID)) %>%
   transmute(TOPPID = as.character(TOPPID), TripDuration_days,
             MassGainRate_kgPerDay_Dcrocker, StandardLength_cm) %>%
   distinct(TOPPID, .keep_all = TRUE)
 
 fem <- bind_rows(
-  read.csv("../results/PB_strategies/A_strategy_assignments.csv") %>% mutate(Trip = "Post-breeding"),
-  read.csv("../results/PM_strategies/A_strategy_assignments.csv") %>% mutate(Trip = "Post-moult")) %>%
+  read.csv(p("results", "PB_strategies", "A_strategy_assignments.csv")) %>% mutate(Trip = "Post-breeding"),
+  read.csv(p("results", "PM_strategies", "A_strategy_assignments.csv")) %>% mutate(Trip = "Post-moult")) %>%
   transmute(TOPPID = as.character(TOPPID), Trip, Year = ProcedureYear) %>%
   left_join(beh %>% dplyr::select(-ProcedureYear, -Trip, -Sex), by = "TOPPID") %>%
   left_join(m1, by = "TOPPID") %>%
@@ -47,6 +53,6 @@ tab <- bind_rows(fem, mal) %>%
     summ(.x) %>% mutate(Year = "All"))) %>%
   ungroup() %>% relocate(Year, .after = Trip)
 
-dir.create("../results/tables", showWarnings = FALSE)
-write.csv(tab, "../results/tables/Table1_by_year_sex.csv", row.names = FALSE)
+dir.create(p("results", "tables"), showWarnings = FALSE)
+write.csv(tab, p("results", "tables", "Table1_by_year_sex.csv"), row.names = FALSE)
 tab
