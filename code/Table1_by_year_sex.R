@@ -62,8 +62,7 @@ tab
 # Writes results/tables/Table1_by_year_sex.docx: a formatted table (landscape,
 # 9 pt Times New Roman, merged Sex/Trip cells, bold "All years" rows) that can
 # be copied straight into the manuscript.
-if (!requireNamespace("flextable", quietly = TRUE) || !requireNamespace("officer", quietly = TRUE))
-  stop("Install the packages for the Word table: install.packages(c(\"flextable\", \"officer\"))")
+
 library(flextable)
 
 HEAD <- c(Sex = "Sex", Trip = "Trip", Year = "Year", n = "n",
