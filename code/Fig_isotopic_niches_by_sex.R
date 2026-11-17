@@ -132,9 +132,12 @@ g_iso <- ggplot(dat, aes(d13C, d15N)) +
   scale_linetype_manual(values = c(Female = "solid", Male = "22"), name = NULL) +
   labs(x = LAB_C, y = LAB_N, tag = "a") + th
 
-xlab_of <- function(d) with(d, ifelse(sex == "Male", "Males", ifelse(trip_lab == "Post-moult", "Females",
+# x-axis order: PB = Subarctic, N Central Pacific, California Current, Males; PM = Females, Males
+X_ORDER <- c("Subarctic", "N Central\nPacific", "California\nCurrent", "Females", "Males")
+xlab_of <- function(d) factor(with(d, ifelse(sex == "Male", "Males", ifelse(trip_lab == "Post-moult", "Females",
                             sub("North Central Pacific", "N Central\nPacific",
-                                sub("California Current", "California\nCurrent", as.character(strategy))))))
+                                sub("California Current", "California\nCurrent", as.character(strategy)))))),
+                              levels = X_ORDER)
 sea_sum$xlab <- xlab_of(sea_sum)
 # Violins show the posterior draws; extreme tails (outside the central 99 %) are
 # dropped for display only, so a long tail in a small group does not squash the axis
