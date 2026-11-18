@@ -485,6 +485,40 @@ round(apply(nb_y$overlap, c(1:2, 4), mean)[, , 1] * 100, 1)
 round(apply(nb_y$seab, 2, median), 3)
 ```
 
+SIBER ellipse areas and overlap for the same-year data set (same settings as above).
+
+```{r siber-sameyears, eval = HAS_SIBER}
+lev_y   <- levels(nd_y$group)
+codes_y <- setNames(paste0("G", seq_along(lev_y)), lev_y)
+siber_y <- SIBER::createSiberObject(data.frame(iso1 = nd_y$d13C, iso2 = nd_y$d15N,
+                                               group = unname(codes_y[as.character(nd_y$group)]),
+                                               community = 1))
+ell_id_y <- setNames(paste0("1.", codes_y), lev_y)
+ml_y <- SIBER::groupMetricsML(siber_y); colnames(ml_y) <- lev_y[match(colnames(ml_y), ell_id_y)]
+set.seed(SEED)
+ell_post_y <- SIBER::siberMVN(siber_y, SIBER_PARMS, SIBER_PRIORS)
+sea_b_y <- SIBER::siberEllipses(ell_post_y); colnames(sea_b_y) <- lev_y[match(names(ell_post_y), ell_id_y)]
+siber_size_y <- data.frame(group = colnames(sea_b_y), n = as.vector(table(nd_y$group)[colnames(sea_b_y)]),
+                           SEAc = ml_y["SEAc", colnames(sea_b_y)],
+                           SEAb_median = apply(sea_b_y, 2, median),
+                           SEAb_lwr = apply(sea_b_y, 2, quantile, 0.025),
+                           SEAb_upr = apply(sea_b_y, 2, quantile, 0.975), row.names = NULL)
+siber_size_y %>% mutate(across(where(is.double), ~ round(.x, 3)))
+write.csv(siber_size_y, file.path(OUT, "4_SIBER_niche_size_sameyears.csv"), row.names = FALSE)
+
+set.seed(SEED)
+siber_ov_y <- bind_rows(lapply(setdiff(lev_y, "Males"), function(gr) {
+  b <- SIBER::bayesianOverlap(ell_id_y[["Males"]], ell_id_y[[gr]], ell_post_y,
+                              draws = SIBER_DRAWS, p.interval = SIBER_P, n = 100)
+  data.frame(comparison = paste("Males vs", gr),
+             prop_of_union = q3(b$overlap / (b$area1 + b$area2 - b$overlap)),
+             prop_of_male_ellipse = q3(b$overlap / b$area1),
+             prop_of_female_ellipse = q3(b$overlap / b$area2))
+}))
+siber_ov_y
+write.csv(siber_ov_y, file.path(OUT, "4_SIBER_overlap_sameyears.csv"), row.names = FALSE)
+```
+
 # 5. Repeatability
 
 ## Population-level repeatability
