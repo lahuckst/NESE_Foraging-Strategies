@@ -1,0 +1,28 @@
+Group,Name,Code,Description,Units,Used in
+Movement and habitat use (clustering variables),Maximum latitude,MaxLat_degrees,Maximum latitude reached during the trip,°N,"S, C"
+Movement and habitat use (clustering variables),Westernmost longitude,MinLon_degrees,Westernmost longitude reached during the trip (0–360° E),°E,S
+Movement and habitat use (clustering variables),Distance to shelf (median),MedianDistToContShelf_km,Median distance of locations to the continental shelf,km,"S, C"
+Movement and habitat use (clustering variables),Distance to shelf (SD),SdDistContShelf_km,Standard deviation of the distance to the continental shelf,km,S
+Movement and habitat use (clustering variables),Time on shelf,MesoEcoProportionShelf,Proportion of the trip spent on the continental shelf,proportion,S
+Movement and habitat use (clustering variables),Time in California Current,MesoEcoProportionCAC,Proportion of the trip spent in the California Current mesoecoregion,proportion,"S, G, C"
+Movement and habitat use (clustering variables),Time in Subarctic Pacific,MesoEcoProportionSubArcticPac,Proportion of the trip spent in the Subarctic Pacific mesoecoregion,proportion,S
+Movement and habitat use (clustering variables),Time in North Central Pacific,MesoEcoProportionNorthCPac,Proportion of the trip spent in the North Central Pacific mesoecoregion,proportion,S
+Diving behaviour (clustering variables),Dive depth (mean),Mean_Depth_m,Mean dive depth,m,S
+Diving behaviour (clustering variables),Dive depth (SD),Mean_Depth_sd,Standard deviation of dive depth,m,S
+Diving behaviour (clustering variables),Dive duration (mean),Mean_Duration_sec,Mean dive duration,s,S
+Diving behaviour (clustering variables),Dive duration (SD),Mean_Duration_sd,Standard deviation of dive duration,s,S
+Diving behaviour (clustering variables),Transit dives,Pct_TransitDives,Percentage of dives classified as transit dives,%,S
+Diving behaviour (clustering variables),Foraging dives,Pct_ForagingDives,Percentage of dives classified as foraging dives,%,S
+Diving behaviour (clustering variables),Drift dives,Pct_DriftDives,Percentage of dives classified as drift dives,%,S
+Diving behaviour (clustering variables),Benthic dives,Pct_BenthicDives,Fraction of dives classified as benthic dives,proportion,S
+Diving behaviour (clustering variables),Time diving,PctTripDiving,Percentage of the trip spent diving,%,S
+Diving behaviour (clustering variables),Day foraging-dive depth,DeepDayForageDivesMedian_m,Median depth of daytime foraging dives (recorded as negative values),m,S
+Diving behaviour (clustering variables),Night foraging-dive depth,DeepNightForageDivesMedian_m,Median depth of night-time foraging dives (recorded as negative values),m,S
+Trip outcome (not used for clustering),Trip duration,TripDuration_days,Duration of the foraging trip,d,"V, T"
+Trip outcome (not used for clustering),Mass gain rate,MassGainRate_kgPerDay_Dcrocker,Rate of mass gain over the trip,kg d⁻¹,"V, T"
+Stable isotopes (not used for clustering),δ¹³C,d13C,"Carbon stable isotope ratio, sampled on arrival",‰,"V, N, G, C, M"
+Stable isotopes (not used for clustering),δ¹⁵N,d15N,"Nitrogen stable isotope ratio, sampled on arrival",‰,"V, N, G, C, M"
+Other variables,Standard length,StandardLength_cm,Standard length (males),cm,M
+Other variables,Year,ProcedureYear,Year of instrument deployment or sampling,—,Covariate or random effect in all tests
+Other variables,Trip type,Trip,Trip type (post-breeding or post-moult),—,Fixed effect in repeatability models
+Other variables,Tracking locations,Tracking locations,Six-hourly locations along each trip,"°N, °E",U
